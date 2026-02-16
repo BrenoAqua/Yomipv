@@ -17,14 +17,16 @@ TODO: Demo
 
 ## Installation
 
-1. **Clone the repository** to your MPV directory:
+1. **Clone the repository** to your MPV directory and install dependencies:
    - Windows: `%APPDATA%/mpv/`
+     ```
+     git clone https://github.com/BrenoAqua/Yomipv && xcopy /e /i /y Yomipv . && rd /s /q Yomipv && cd scripts\yomipv\lookup-app && npm install
+     ```
+   
    - Linux: `~/.config/mpv/`
-
-2. **Install Dependencies**:
-   - Navigate to `scripts/yomipv/lookup-app/`
-   - Run `npm install` to install required Node.js packages.
-
+     ```
+     git clone https://github.com/BrenoAqua/Yomipv && cp -rn Yomipv/* . && rm -rf Yomipv && cd scripts/yomipv/lookup-app && npm install
+     ```
 3. **Configure Settings**:
    - Open `script-opts/yomipv.conf` and update your Anki deck/note type names and field mappings.
 
@@ -43,8 +45,8 @@ TODO: Demo
 
 ### Advanced Features
 
-- **Append Mode (`C`)**: Select multiple subtitle lines before exporting
-  - Press `C` to enter append mode, `c` to export, or `C` again to cancel
+- **Append Mode (`Shift+C`)**: Select multiple subtitle lines before exporting
+  - Press `Shift+C` to enter append mode, `c` to start the word selector, or `Shift+C` again to cancel
 
 - **Selection Expansion**:
   - **`Ctrl+Left`** / **`Ctrl+Right`**: Expand selection to adjacent words
