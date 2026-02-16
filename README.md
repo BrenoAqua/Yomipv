@@ -59,6 +59,8 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - **History Panel (`a`)**: Toggle subtitle history panel
   - Click on previous/next lines to select them to expand the subtitle lines (when selector is open) or seek to that timestamp (when selector is closed)
 
+There are demos for all features [here](https://github.com/BrenoAqua/Yomipv/tree/main/features)
+
 ## Troubleshooting
 
 ### Windows
