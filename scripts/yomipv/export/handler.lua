@@ -28,6 +28,33 @@ local DEFAULT_YOMITAN_FIELDS = {
 
 local EXPANSION_TIMEOUT = 0.05
 
+-- Parse multiple handlebar names from config string
+-- Supports formats: {handlebar1}{handlebar2} or handlebar1,handlebar2
+local function parse_handlebars(handlebar_string)
+	if not handlebar_string or handlebar_string == "" then
+		return {}
+	end
+
+	local handlebars = {}
+
+	-- Try Yomitan format: {handlebar1}{handlebar2}{handlebar3}
+	for handlebar in handlebar_string:gmatch("{([^}]+)}") do
+		table.insert(handlebars, handlebar)
+	end
+
+	-- Fallback to comma-separated or single value
+	if #handlebars == 0 then
+		for handlebar in handlebar_string:gmatch("[^,]+") do
+			local trimmed = handlebar:match("^%s*(.-)%s*$")
+			if trimmed and trimmed ~= "" then
+				table.insert(handlebars, trimmed)
+			end
+		end
+	end
+
+	return handlebars
+end
+
 -- Get field value from entry data structure
 local function get_field_value(entry, field_name)
 	if not entry or not field_name then
@@ -434,12 +461,34 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 		set_field(self.config.dictionary_pref_field, self.config.dictionary_pref_value)
 	end
 
-	if self.config.definition_handlebar and self.config.definition_handlebar ~= "" then
-		set_field(self.config.definition_field, get_field_value(entry, self.config.definition_handlebar))
+	-- Combine multiple definition handlebars
+	local definition_handlebars = parse_handlebars(self.config.definition_handlebar)
+	if #definition_handlebars > 0 then
+		local combined_definition = ""
+		for _, handlebar in ipairs(definition_handlebars) do
+			local value = get_field_value(entry, handlebar)
+			if value and value ~= "" then
+				combined_definition = combined_definition .. value
+			end
+		end
+		if combined_definition ~= "" then
+			set_field(self.config.definition_field, combined_definition)
+		end
 	end
 
-	if self.config.glossary_handlebar and self.config.glossary_handlebar ~= "" then
-		set_field(self.config.glossary_field, get_field_value(entry, self.config.glossary_handlebar))
+	-- Combine multiple glossary handlebars
+	local glossary_handlebars = parse_handlebars(self.config.glossary_handlebar)
+	if #glossary_handlebars > 0 then
+		local combined_glossary = ""
+		for _, handlebar in ipairs(glossary_handlebars) do
+			local value = get_field_value(entry, handlebar)
+			if value and value ~= "" then
+				combined_glossary = combined_glossary .. value
+			end
+		end
+		if combined_glossary ~= "" then
+			set_field(self.config.glossary_field, combined_glossary)
+		end
 	end
 
 	if entry.audio and not Collections.is_void(self.config.expression_audio_field) then
@@ -664,12 +713,16 @@ end
 function Handler:build_yomitan_fields()
 	local fields = Collections.duplicate(DEFAULT_YOMITAN_FIELDS)
 
-	if self.config.definition_handlebar and self.config.definition_handlebar ~= "" then
-		table.insert(fields, self.config.definition_handlebar)
+	-- Add all definition handlebars
+	local definition_handlebars = parse_handlebars(self.config.definition_handlebar)
+	for _, handlebar in ipairs(definition_handlebars) do
+		table.insert(fields, handlebar)
 	end
 
-	if self.config.glossary_handlebar and self.config.glossary_handlebar ~= "" then
-		table.insert(fields, self.config.glossary_handlebar)
+	-- Add all glossary handlebars
+	local glossary_handlebars = parse_handlebars(self.config.glossary_handlebar)
+	for _, handlebar in ipairs(glossary_handlebars) do
+		table.insert(fields, handlebar)
 	end
 
 	return fields
