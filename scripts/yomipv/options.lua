@@ -138,6 +138,10 @@ local default_options = {
 	selector_hide_ui = true, -- Hide player UI while selector is active
 	selector_navigation_delay = 0.05, -- Input delay between repeated navigation actions
 
+	-- Lookup
+	selector_lookup_on_hover = false, -- Automatically show lookup when hovering over terms
+	selector_lookup_on_navigation = false, -- Automatically show lookup when navigating with keyboard
+
 	-- Typography
 	selector_font_name = "", -- Fallback to mpv sub-font if unset
 	selector_font_size = 45, -- Fallback to mpv sub-font-size if 0 provided

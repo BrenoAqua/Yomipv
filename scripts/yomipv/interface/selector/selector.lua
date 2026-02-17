@@ -379,6 +379,9 @@ function Selector:start(tokens, callback, style)
 	self.input_timer = mp.add_periodic_timer(0.04, function()
 		Interaction.check_hover(self)
 	end)
+
+	-- Trigger initial lookup if auto-lookup is enabled
+	Interaction.trigger_initial_lookup(self)
 end
 
 return Selector

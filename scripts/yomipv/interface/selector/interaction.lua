@@ -6,6 +6,48 @@ local StringOps = require("lib.string_ops")
 
 local Interaction = {}
 
+-- Trigger lookup based on specific trigger source
+local function trigger_lookup_if_enabled(selector, trigger_source)
+	local should_trigger = false
+	if trigger_source == "hover" then
+		should_trigger = selector.style.lookup_on_hover
+	elseif trigger_source == "navigation" then
+		should_trigger = selector.style.lookup_on_navigation
+	else
+		-- Trigger initial lookup if either option is enabled
+		should_trigger = selector.style.lookup_on_navigation or selector.style.lookup_on_hover
+	end
+
+	if should_trigger and selector.tokens[selector.index] and selector.tokens[selector.index].is_term then
+		local token = selector.tokens[selector.index]
+		local data = {
+			term = token.text,
+			reading = token.reading or (token.headwords and token.headwords[1] and token.headwords[1].reading),
+		}
+		if selector.style.on_lookup then
+			selector.style.on_lookup(data)
+		end
+	end
+end
+
+-- Hide lookup unless about to trigger it (prevents race condition)
+local function hide_if_needed(selector, trigger_source)
+	local will_trigger_lookup = false
+	if trigger_source == "hover" then
+		will_trigger_lookup = selector.style.lookup_on_hover
+	elseif trigger_source == "navigation" then
+		will_trigger_lookup = selector.style.lookup_on_navigation
+	end
+
+	will_trigger_lookup = will_trigger_lookup
+		and selector.tokens[selector.index]
+		and selector.tokens[selector.index].is_term
+
+	if selector.style.on_hide and not will_trigger_lookup then
+		selector.style.on_hide()
+	end
+end
+
 local function on_left(selector)
 	selector.selection_len = 1
 	local old_index = selector.index
@@ -16,11 +58,12 @@ local function on_left(selector)
 		selector.index = old_index
 	end
 
-	if selector.style.on_hide and old_index ~= selector.index then
-		selector.style.on_hide()
+	if old_index ~= selector.index then
+		hide_if_needed(selector, "navigation")
 	end
 
 	selector:render()
+	trigger_lookup_if_enabled(selector, "navigation")
 end
 
 local function on_right(selector)
@@ -33,11 +76,12 @@ local function on_right(selector)
 		selector.index = old_index
 	end
 
-	if selector.style.on_hide and old_index ~= selector.index then
-		selector.style.on_hide()
+	if old_index ~= selector.index then
+		hide_if_needed(selector, "navigation")
 	end
 
 	selector:render()
+	trigger_lookup_if_enabled(selector, "navigation")
 end
 
 -- Find best candidate for vertical navigation (up/down)
@@ -117,10 +161,9 @@ local function on_up(selector)
 	local best_candidate = find_vertical_neighbor(selector, "up")
 	if best_candidate then
 		selector.index = best_candidate
-		if selector.style.on_hide then
-			selector.style.on_hide()
-		end
+		hide_if_needed(selector, "navigation")
 		selector:render()
+		trigger_lookup_if_enabled(selector, "navigation")
 	end
 end
 
@@ -129,10 +172,9 @@ local function on_down(selector)
 	local best_candidate = find_vertical_neighbor(selector, "down")
 	if best_candidate then
 		selector.index = best_candidate
-		if selector.style.on_hide then
-			selector.style.on_hide()
-		end
+		hide_if_needed(selector, "navigation")
 		selector:render()
+		trigger_lookup_if_enabled(selector, "navigation")
 	end
 end
 
@@ -198,10 +240,9 @@ function Interaction.check_hover(selector)
 		if mx >= entry.x1 and mx <= entry.x2 and my >= entry.y1 and my <= entry.y2 then
 			if selector.index ~= entry.index then
 				selector.index = entry.index
-				if selector.style.on_hide then
-					selector.style.on_hide()
-				end
+				hide_if_needed(selector, "hover")
 				selector:render()
+				trigger_lookup_if_enabled(selector, "hover")
 			end
 			hit = true
 			break
@@ -309,6 +350,10 @@ function Interaction.unbind(selector)
 		end
 		selector.registered_keys = {}
 	end
+end
+
+function Interaction.trigger_initial_lookup(selector)
+	trigger_lookup_if_enabled(selector)
 end
 
 return Interaction

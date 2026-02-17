@@ -600,6 +600,8 @@ function Handler:build_selector_style(update_range_fn, was_paused)
 		key_lookup = self.config.key_selector_lookup,
 		key_split = self.config.key_selector_split,
 		navigation_delay = self.config.selector_navigation_delay,
+		lookup_on_hover = self.config.selector_lookup_on_hover,
+		lookup_on_navigation = self.config.selector_lookup_on_navigation,
 		yomitan = self.deps.yomitan,
 		on_expand_prev = function()
 			update_range_fn(-1)
