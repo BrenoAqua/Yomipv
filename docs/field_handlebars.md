@@ -29,7 +29,7 @@ glossary_handlebar=single-glossary-DICT-NAME-1,single-glossary-DICT-NAME-2,singl
 
 ```
 definition_handlebar=popup-selection-text
-definition_handlebar=single-glossary-jitendexorg-DICT-NAME
+definition_handlebar=single-glossary-DICT-NAME
 definition_handlebar=glossary
 ```
 
