@@ -250,9 +250,15 @@ document.addEventListener('mouseup', () => {
       selection.addRange(range);
     }
 
-    document.designMode = 'on';
-    document.execCommand('bold', false, null);
-    document.designMode = 'off';
+    const span = document.createElement('span');
+    span.className = 'highlight';
+    try {
+      range.surroundContents(span);
+    } catch (e) {
+      // Fallback if selection crosses complex boundaries
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+    }
 
     // Update the main process with the modified HTML
     const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
