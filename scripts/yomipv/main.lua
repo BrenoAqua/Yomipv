@@ -103,15 +103,7 @@ local function launch_lookup_app()
 		local ipc_pipe = mp.get_property("input-ipc-server")
 
 		local function is_valid_pipe(pipe)
-			if not pipe or pipe == "" then
-				return false
-			end
-			if Platform.IS_WINDOWS then
-				return pipe:match("^\\\\.\\pipe\\")
-			elseif Platform.IS_MACOS or Platform.IS_LINUX then
-				return pipe:find("/")
-			end
-			return false
+			return pipe and pipe ~= ""
 		end
 
 		if not is_valid_pipe(ipc_pipe) then
@@ -125,7 +117,12 @@ local function launch_lookup_app()
 
 		Player.notify("Yomipv: Starting lookup app...", "info")
 
-		Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, function(launch_success, _launch_result, launch_error)
+		local electron_ipc_pipe = ipc_pipe
+		if Platform.IS_WINDOWS and not electron_ipc_pipe:match("^\\\\.\\pipe\\") then
+			electron_ipc_pipe = "\\\\.\\pipe\\" .. electron_ipc_pipe
+		end
+
+		Platform.launch_electron_app(app_path, mpv_pid, electron_ipc_pipe, function(launch_success, _launch_result, launch_error)
 			if not launch_success then
 				msg.error("Failed to launch lookup app: " .. tostring(launch_error))
 			else
