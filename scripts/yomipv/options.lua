@@ -138,6 +138,7 @@ local default_options = {
 	-- Lookup
 	selector_lookup_on_hover = false, -- Automatically show lookup on hover
 	selector_lookup_on_navigation = false, -- Automatically show lookup on navigation
+	lookup_show_frequencies = true,
 
 	-- Typography
 	selector_font_name = "", -- Fallback to mpv sub-font if unset

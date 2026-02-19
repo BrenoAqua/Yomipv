@@ -6,37 +6,44 @@ const headerEl = document.getElementById('term-header');
 ipcRenderer.on('lookup-term', async (event, data) => {
   console.log('[IPC] Received lookup data:', JSON.stringify(data));
 
-  const renderHeader = (term, reading, furigana) => {
+  const renderHeader = (term, reading, furigana, frequencies) => {
     const cleanTerm = (term || '').trim();
     console.log(`[UI] Rendering header: term="${cleanTerm}"`);
 
+    let headerHtml = '';
     if (furigana && furigana.includes('[')) {
-      // Parse Yomitan format: 敵[かな]わない -> <ruby>敵<rt>かな</rt></ruby>わない
-      const rubyHtml = furigana.replace(/([^\[\]]+)\[([^\[\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
-      headerEl.innerHTML = `
-        <div class="term-display">
-          ${rubyHtml}
-        </div>
-      `;
+      headerHtml = furigana.replace(/([^\[\]]+)\[([^\[\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
     } else if (reading && reading !== cleanTerm) {
-      headerEl.innerHTML = `
-        <div class="term-display">
-          <ruby>
-            ${cleanTerm}
-            <rt>${reading}</rt>
-          </ruby>
-        </div>
-      `;
+      headerHtml = `<ruby>${cleanTerm}<rt>${reading}</rt></ruby>`;
     } else {
-      headerEl.innerHTML = `
-        <div class="term-display">
-          <div class="term-expression">${cleanTerm}</div>
+      headerHtml = `<div class="term-expression">${cleanTerm}</div>`;
+    }
+
+    let freqHtml = '';
+    if (frequencies && frequencies.length > 0) {
+      freqHtml = `
+        <div class="frequency-badges" style="margin: 0;">
+          ${frequencies.map(f => `
+            <div class="frequency-badge">
+              <span class="frequency-dict">${f.dictionary}</span>
+              <span class="frequency-value">${f.frequency}</span>
+            </div>
+          `).join('')}
         </div>
       `;
     }
+
+    headerEl.innerHTML = `
+      <div class="term-display">
+        ${headerHtml}
+      </div>
+      <div class="header-frequencies">
+        ${freqHtml}
+      </div>
+    `;
   };
 
-  renderHeader(data.term, data.reading);
+  renderHeader(data.term, data.reading, null, null);
 
   glossaryEl.innerHTML = '<div class="loading">Looking up...</div>';
 
@@ -55,7 +62,11 @@ ipcRenderer.on('lookup-term', async (event, data) => {
           body: JSON.stringify({
             text: data.term,
             type: 'term',
-            markers: ['glossary', 'expression', 'reading', 'furigana', 'pitch-accent-categories', 'pitch-accents'],
+            markers: [
+              'glossary', 'expression', 'reading', 'furigana', 
+              'pitch-accent-categories', 'pitch-accents',
+              ...(data.showFrequencies ? ['frequencies'] : [])
+            ],
             maxEntries: 10,
             includeMedia: true
           })
@@ -76,17 +87,88 @@ ipcRenderer.on('lookup-term', async (event, data) => {
       throw new Error('All Yomitan endpoints failed');
     }
 
-    console.log('API Result:', result);
-
     const entries = (result && result.fields) || (result && result[0] && result[0].fields) || [];
-    
+
     let fields = null;
     if (Array.isArray(entries) && entries.length > 0) {
-      // Prioritize entries with pitch accent or kanji
-      fields = entries.find(e => (e['pitch-accents'] && e['pitch-accents'] !== '') || (e.expression && e.expression !== e.reading)) || entries[0];
+      // Prioritize pitch accent or kanji
+      fields = entries.find(e => {
+        const f = e.fields || e;
+        return (f['pitch-accents'] && f['pitch-accents'] !== '') || (f.expression && f.expression !== f.reading);
+      }) || entries[0];
+      if (fields.fields) fields = fields.fields;
     } else if (entries && !Array.isArray(entries)) {
       fields = entries;
     }
+
+    const targetExpression = fields ? fields.expression : data.term;
+    const targetReading = fields ? fields.reading : data.reading;
+
+    const allFrequenciesMap = new Map();
+    if (data.showFrequencies && Array.isArray(entries)) {
+      entries.forEach(entry => {
+        const eFields = entry.fields || entry;
+        if (!eFields.frequencies) return;
+        
+        if (eFields.expression !== targetExpression || eFields.reading !== targetReading) {
+          return;
+        }
+        
+        let freqData = [];
+        const rawValue = eFields.frequencies;
+        
+        try {
+          const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+          freqData = Array.isArray(parsed) ? parsed : [parsed];
+        } catch (e) {
+          const cleanText = rawValue.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+          
+        // Match "Dict Name: Value" pairs
+          const pattern = /([^:,\(\)]+):\s*([^:,\(\)]+?)(?=\s+[^:,\(\)]+:|$)/g;
+          const matches = Array.from(cleanText.matchAll(pattern));
+          
+          if (matches.length > 0) {
+            freqData = matches.map(m => ({
+              dictionary: m[1].trim(),
+              frequency: m[2].trim()
+            }));
+          } else if (cleanText.includes(':')) {
+            const [dict, val] = cleanText.split(/:\s*/);
+            freqData = [{ dictionary: dict.trim(), frequency: val.trim() }];
+          } else if (cleanText.length > 0) {
+            freqData = [{ dictionary: 'Freq', frequency: cleanText }];
+          }
+        }
+        
+        if (Array.isArray(freqData)) {
+          freqData.forEach(f => {
+            if (!f || !f.dictionary || !f.frequency) return;
+            
+            const dict = String(f.dictionary).replace(/<[^>]*>/g, '').trim();
+            let freq = String(f.frequency).replace(/<[^>]*>/g, '').trim();
+            
+            if (freq.toLowerCase().endsWith(dict.toLowerCase())) {
+              freq = freq.substring(0, freq.length - dict.length).trim();
+            }
+            [' Jiten', ' Wikipedia', ' Ranked', ' Info'].forEach(s => {
+              if (freq.endsWith(s)) freq = freq.substring(0, freq.length - s.length).trim();
+            });
+
+            if (dict && freq) {
+              const existing = allFrequenciesMap.get(dict);
+              if (existing) {
+                if (!existing.frequency.includes(freq)) {
+                  existing.frequency += `, ${freq}`;
+                }
+              } else {
+                allFrequenciesMap.set(dict, { dictionary: dict, frequency: freq });
+              }
+            }
+          });
+        }
+      });
+    }
+    const frequencies = Array.from(allFrequenciesMap.values());
 
     if (fields && (fields.glossary || fields.definition)) {
       const term = fields.expression || data.term;
@@ -105,7 +187,7 @@ ipcRenderer.on('lookup-term', async (event, data) => {
         }
       }
 
-      renderHeader(term, reading, furigana);
+      renderHeader(term, reading, furigana, frequencies);
 
       const pitchTarget = fields['pitch-accent-categories'] || '';
       console.log(`[UI] Pitch accent categories: "${pitchTarget}"`);
@@ -134,7 +216,7 @@ ipcRenderer.on('lookup-term', async (event, data) => {
       tempDiv.innerHTML = content;
       tempDiv.querySelectorAll('img').forEach(img => img.remove());
       
-      // Merge Jitendex entries while preserving sense structure
+      // Preserve Jitendex sense structure
       tempDiv.querySelectorAll('[data-dictionary*="Jitendex"]').forEach(dictEl => {
         dictEl.querySelectorAll('[data-sc-content="glossary"]').forEach(glossaryEl => {
           const children = Array.from(glossaryEl.childNodes);
@@ -145,7 +227,6 @@ ipcRenderer.on('lookup-term', async (event, data) => {
             const isElement = node.nodeType === Node.ELEMENT_NODE && !node.matches('span[data-details]');
             
             if (isText || isElement) {
-              // Strip sense markers from node start
               let text = node.textContent;
               if (text.match(/^[①-⑳]/)) {
                 text = text.replace(/^[①-⑳]\s*/, '');
@@ -170,14 +251,12 @@ ipcRenderer.on('lookup-term', async (event, data) => {
 
       glossaryEl.innerHTML = tempDiv.innerHTML;
 
-      // Disable links and pointer events
       glossaryEl.querySelectorAll('a, [data-link]').forEach(el => {
         el.onclick = (e) => e.preventDefault();
         el.style.pointerEvents = 'none';
         el.style.cursor = 'default';
       });
 
-      // Strip parentheses from dictionary titles
       glossaryEl.querySelectorAll('[data-dictionary]').forEach(el => {
         const titleEl = el.firstElementChild;
         if (titleEl) {
@@ -209,7 +288,6 @@ ipcRenderer.on('lookup-term', async (event, data) => {
             styleHtml = styleEl.outerHTML;
           }
           
-          // Reconstruct glossary structure for single dictionary
           const dictContent = `<div class="yomitan-glossary" style="text-align: left;"><ol>${dictionaryHtml}</ol></div>${styleHtml}`;
           console.log('[UI] Dictionary selected:', el.getAttribute('data-dictionary'));
           
@@ -225,7 +303,6 @@ ipcRenderer.on('lookup-term', async (event, data) => {
 
 document.addEventListener('selectionchange', () => {
   let selection = window.getSelection().toString().trim();
-  // Convert newlines to <br> tags
   selection = selection.replace(/\r?\n/g, '<br>');
   console.log('[UI] selectionchange:', selection);
   ipcRenderer.send('sync-selection', selection);
@@ -252,12 +329,11 @@ document.addEventListener('mouseup', () => {
     try {
       range.surroundContents(span);
     } catch (e) {
-      // Fallback if selection crosses complex boundaries
+      // Crossing complex boundaries
       span.appendChild(range.extractContents());
       range.insertNode(span);
     }
 
-    // Update main process with modified HTML
     const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
     if (selectedTitle) {
       const dictEl = selectedTitle.parentElement;

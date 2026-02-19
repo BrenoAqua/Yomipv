@@ -6,7 +6,7 @@
   --text-primary: #e0e0e0;
   --text-secondary: #aaa;
   --text-muted: #777;
-  --accent-color: #ffffff; 
+  --accent-color: #ffffff;
   --devoiced-color: cornflowerBlue;
   --pitch-red: #F5436D;    /* atamadaka */
   --pitch-blue: #39C1FF;   /* heiban */
@@ -53,14 +53,17 @@ body {
 }
 
 #term-header {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   line-height: 1.1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
 }
 
 .term-display {
-  display: inline-block;
+  flex-shrink: 0;
   color: var(--pitch-accent-color);
   text-align: left;
 }
@@ -74,6 +77,49 @@ body {
   font-size: 20px;
   line-height: 1.5;
   width: 100%;
+}
+
+.header-frequencies {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 12px;
+  flex: 1;
+}
+
+.frequency-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.frequency-badge {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  padding: 0;
+  overflow: hidden;
+  line-height: 1;
+}
+
+.frequency-dict {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-right: 1px solid var(--border-color);
+}
+
+.frequency-value {
+  padding: 4px 8px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .loading {
@@ -96,8 +142,6 @@ body {
   background: #444;
   border-radius: 10px;
 }
-
-/* Yomitan UI Elements */
 
 /* Dictionary Header */
 [data-dictionary] {
@@ -153,7 +197,6 @@ body {
     color: var(--selection-color);
 }
 
-/* Siblings block/inline layout */
 [data-dictionary] > *:not(:first-child) {
     display: block;
 }
@@ -172,12 +215,10 @@ span[data-details] {
   margin-bottom: 2px;
 }
 
-/* Native tag highlighting */
 [data-details*="noun"], [data-details*="verb"], [data-details*="adj"] {
   border-left: 2px solid var(--accent-color);
 }
 
-/* Glossary senses */
 ol, ul {
   margin: 6px 0;
   padding-left: 0;
@@ -217,7 +258,6 @@ li {
   margin-bottom: 12px;
 }
 
-/* Jitendex list styling overrides */
 [data-dictionary*="Jitendex"] ol, 
 [data-dictionary*="Jitendex"] ul,
 [data-dictionary*="Jitendex"] li {

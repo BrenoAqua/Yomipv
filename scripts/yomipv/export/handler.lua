@@ -85,7 +85,6 @@ end
 
 local function format_sentence_html(self, prefix, body, suffix, tag)
 	local closing_tag = tag:match("<(%w+)")
-	-- Extract tag name to properly close wrap (e.g. <b> -> </b>)
 	closing_tag = closing_tag and ("</" .. closing_tag .. ">") or "</span>"
 	local content = string.format("%s%s%s%s%s", prefix or "", tag or "", body or "", closing_tag, suffix or "")
 	return string.format(self.config.primary_sentence_wrapper, content)
@@ -150,7 +149,6 @@ function Handler:toggle_mark_range()
 	end
 end
 
--- Load and clean subtitle context from session tracker
 function Handler:initialize_export_context(gui)
 	Player.notify("Yomitan: Initializing...")
 	msg.info("Starting Yomitan export flow")
@@ -169,7 +167,6 @@ function Handler:initialize_export_context(gui)
 
 		if history_subs and #history_subs > 0 then
 			local last_relevant = nil
-			-- Find latest sub that started before or at current time
 			for i = #history_subs, 1, -1 do
 				local entry = history_subs[i]
 				if entry.start <= time_pos then
@@ -276,7 +273,6 @@ function Handler:open_selector(context, tokens, was_paused)
 	msg.info("Starting selector with " .. #tokens .. " tokens")
 	Player.notify("Yomitan: Select word...")
 
-	-- Navigation callback for expanding range via UI
 	local update_range_fn = function(direction)
 		self:update_range_async(context, direction)
 	end
@@ -412,7 +408,6 @@ function Handler:process_note_content(context, entry, data, picture, audio, sele
 			split_cloze(context.sub.primary_sid, entry.expression, selected_token.text, selected_token.offset)
 	end
 
-	-- Generate fallback cloze highlighting if Yomitan fields are empty
 	if not Collections.is_void(self.config.sentence_field) then
 		note_fields[self.config.sentence_field] =
 			format_sentence_html(self, cloze_prefix, cloze_body, cloze_suffix, self.config.sentence_highlight_tag)
@@ -465,12 +460,10 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 	set_field(self.config.freq_field, get_field_value(entry, "frequencies"))
 	set_field(self.config.freq_sort_field, get_field_value(entry, "frequency-harmonic-rank"))
 
-	-- Only set dictionary preference for Senren note types
 	if self.config.note_type and self.config.note_type:find("Senren") then
 		set_field(self.config.dictionary_pref_field, self.config.dictionary_pref_value)
 	end
 
-	-- Handlebar processing with user preference priority logic
 	local function process_handlebars(field_config, target_field)
 		local handlebars = parse_handlebars(field_config)
 		if #handlebars == 0 then
@@ -481,7 +474,6 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 		local selected_dict_content = get_field_value(entry, "selected-dict")
 		local use_priority = false
 
-		-- Check priority
 		for _, handlebar in ipairs(handlebars) do
 			if
 				(handlebar == "selected-dict" or handlebar == "selected-text")
@@ -494,7 +486,6 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 			end
 		end
 
-		-- Fallback
 		if not use_priority then
 			for _, handlebar in ipairs(handlebars) do
 				local value = get_field_value(entry, handlebar)
@@ -509,7 +500,6 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 		end
 	end
 
-	-- Apply definition and glossary fields using the helper
 	process_handlebars(self.config.definition_handlebar, self.config.definition_field)
 	process_handlebars(self.config.glossary_handlebar, self.config.glossary_field)
 	process_handlebars(self.config.selection_text_handlebar, self.config.selection_text_field)
@@ -519,15 +509,11 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 	end
 end
 
--- Perform the final save to Anki
-
--- Async and expansion helpers
 function Handler:expand_to_subtitle_method(context, target_subtitle)
 	if not target_subtitle or not target_subtitle.start then
 		return
 	end
 
-	-- Handle seek if selector is not active
 	if not self.deps.selector.active then
 		if target_subtitle.start >= 0 then
 			mp.set_property_number("time-pos", target_subtitle.start)
@@ -536,7 +522,6 @@ function Handler:expand_to_subtitle_method(context, target_subtitle)
 		return
 	end
 
-	-- Expand step-by-step
 	if target_subtitle.start < context.first_subtitle.start then
 		local function step_back()
 			msg.info(
@@ -690,9 +675,13 @@ function Handler:build_selector_style(update_range_fn, was_paused)
 			end
 		end,
 		on_lookup = function(data)
-			-- Reset selected dictionary on new lookup
 			self.selected_dictionary = nil
-			local json_body = require("mp.utils").format_json(data)
+			local data_to_send = {
+				term = data.term,
+				reading = data.reading,
+				showFrequencies = self.config.lookup_show_frequencies,
+			}
+			local json_body = require("mp.utils").format_json(data_to_send)
 			-- Use direct subprocess for reliability with explicit UTF-8 header
 			mp.command_native_async({
 				name = "subprocess",
@@ -734,10 +723,8 @@ end
 
 function Handler:build_yomitan_fields()
 	local fields = Collections.duplicate(DEFAULT_YOMITAN_FIELDS)
-	-- Handle client-side handlebars
 	local client_side_handlebars = { ["selected-dict"] = true }
 
-	-- Add all definition handlebars
 	local definition_handlebars = parse_handlebars(self.config.definition_handlebar)
 	for _, handlebar in ipairs(definition_handlebars) do
 		if not client_side_handlebars[handlebar] then
