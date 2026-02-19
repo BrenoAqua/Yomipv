@@ -6,18 +6,24 @@ const headerEl = document.getElementById('term-header');
 ipcRenderer.on('lookup-term', async (event, data) => {
   console.log('[IPC] Received lookup data:', JSON.stringify(data));
 
-  // Render header components
-  const renderHeader = (term, readingHtml) => {
+  const renderHeader = (term, reading, furigana) => {
     const cleanTerm = (term || '').trim();
-    
     console.log(`[UI] Rendering header: term="${cleanTerm}"`);
 
-    if (readingHtml && readingHtml !== cleanTerm) {
+    if (furigana && furigana.includes('[')) {
+      // Parse Yomitan format: 敵[かな]わない -> <ruby>敵<rt>かな</rt></ruby>わない
+      const rubyHtml = furigana.replace(/([^\[\]]+)\[([^\[\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
+      headerEl.innerHTML = `
+        <div class="term-display">
+          ${rubyHtml}
+        </div>
+      `;
+    } else if (reading && reading !== cleanTerm) {
       headerEl.innerHTML = `
         <div class="term-display">
           <ruby>
             ${cleanTerm}
-            <rt>${readingHtml}</rt>
+            <rt>${reading}</rt>
           </ruby>
         </div>
       `;
@@ -30,17 +36,13 @@ ipcRenderer.on('lookup-term', async (event, data) => {
     }
   };
 
-  // Initial header update
   renderHeader(data.term, data.reading);
 
-  // Show loading state
   glossaryEl.innerHTML = '<div class="loading">Looking up...</div>';
 
   try {
-    // Fetch from Yomitan API
     console.log('Sending request for:', data.term);
     
-    // Iterate through available API endpoints
     let result;
     const endpoints = [`http://127.0.0.1:19633/ankiFields`, `http://127.0.0.1:19633/api/ankiFields`];
     
@@ -53,7 +55,8 @@ ipcRenderer.on('lookup-term', async (event, data) => {
           body: JSON.stringify({
             text: data.term,
             type: 'term',
-            markers: ['glossary', 'expression', 'reading', 'pitch-accent-categories', 'pitch-accents'],
+            markers: ['glossary', 'expression', 'reading', 'furigana', 'pitch-accent-categories', 'pitch-accents'],
+            maxEntries: 10,
             includeMedia: true
           })
         });
@@ -75,14 +78,20 @@ ipcRenderer.on('lookup-term', async (event, data) => {
 
     console.log('API Result:', result);
 
-    const entries = (result && result.fields) || (result && result[0] && result[0].fields);
-    const fields = entries ? (Array.isArray(entries) ? entries[0] : entries) : null;
+    const entries = (result && result.fields) || (result && result[0] && result[0].fields) || [];
+    
+    let fields = null;
+    if (Array.isArray(entries) && entries.length > 0) {
+      // Prioritize entries with pitch accent or kanji
+      fields = entries.find(e => (e['pitch-accents'] && e['pitch-accents'] !== '') || (e.expression && e.expression !== e.reading)) || entries[0];
+    } else if (entries && !Array.isArray(entries)) {
+      fields = entries;
+    }
 
     if (fields && (fields.glossary || fields.definition)) {
-      // Use reading from API results if available
       const term = fields.expression || data.term;
+      const furigana = fields.furigana || '';
       
-      // Use first pitch accent as reading
       let reading = fields.reading || data.reading;
       const pitchAccents = fields['pitch-accents'] || '';
       
@@ -96,9 +105,8 @@ ipcRenderer.on('lookup-term', async (event, data) => {
         }
       }
 
-      renderHeader(term, reading);
+      renderHeader(term, reading, furigana);
 
-      // Apply pitch accent colors
       const pitchTarget = fields['pitch-accent-categories'] || '';
       console.log(`[UI] Pitch accent categories: "${pitchTarget}"`);
       
@@ -110,7 +118,6 @@ ipcRenderer.on('lookup-term', async (event, data) => {
         'kifuku': 'var(--pitch-purple)'
       };
 
-      // Extract first matching category
       const firstPitch = pitchTarget.split(/[\s,]+/).find(p => pitchColors[p.toLowerCase()]);
       
       if (firstPitch) {
@@ -125,11 +132,9 @@ ipcRenderer.on('lookup-term', async (event, data) => {
       
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = content;
-      
-      // Remove images
       tempDiv.querySelectorAll('img').forEach(img => img.remove());
       
-      // Join Jitendex entries while preserving sense structure
+      // Merge Jitendex entries while preserving sense structure
       tempDiv.querySelectorAll('[data-dictionary*="Jitendex"]').forEach(dictEl => {
         dictEl.querySelectorAll('[data-sc-content="glossary"]').forEach(glossaryEl => {
           const children = Array.from(glossaryEl.childNodes);
@@ -158,7 +163,6 @@ ipcRenderer.on('lookup-term', async (event, data) => {
           });
         });
 
-        // Reset Jitendex list styles
         dictEl.querySelectorAll('li').forEach(li => {
           li.style.listStyle = 'none';
         });
@@ -173,7 +177,7 @@ ipcRenderer.on('lookup-term', async (event, data) => {
         el.style.cursor = 'default';
       });
 
-      // Sanitize dictionary titles
+      // Strip parentheses from dictionary titles
       glossaryEl.querySelectorAll('[data-dictionary]').forEach(el => {
         const titleEl = el.firstElementChild;
         if (titleEl) {
@@ -184,24 +188,20 @@ ipcRenderer.on('lookup-term', async (event, data) => {
       glossaryEl.innerHTML = `No result found for "${data.term}".`;
     }
 
-    // Add selection listeners to dictionary titles
     glossaryEl.querySelectorAll('[data-dictionary]').forEach(el => {
       const titleEl = el.firstElementChild;
       if (titleEl) {
         titleEl.style.cursor = 'pointer';
         
         titleEl.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent event bubbling
+          e.stopPropagation();
 
-          // Clear previous selections
           glossaryEl.querySelectorAll('[data-dictionary] > *:first-child').forEach(child => {
             child.classList.remove('selected');
           });
 
-          // Apply selection style
           titleEl.classList.add('selected');
           
-          // Extract dictionary content
           const dictionaryHtml = el.outerHTML;
           let styleHtml = '';
           const styleEl = glossaryEl.querySelector('style');
@@ -213,7 +213,6 @@ ipcRenderer.on('lookup-term', async (event, data) => {
           const dictContent = `<div class="yomitan-glossary" style="text-align: left;"><ol>${dictionaryHtml}</ol></div>${styleHtml}`;
           console.log('[UI] Dictionary selected:', el.getAttribute('data-dictionary'));
           
-          // Sync state to main process
           ipcRenderer.send('dictionary-selected', dictContent);
         });
       }
@@ -224,7 +223,6 @@ ipcRenderer.on('lookup-term', async (event, data) => {
   }
 });
 
-// Sync text selection to main process
 document.addEventListener('selectionchange', () => {
   let selection = window.getSelection().toString().trim();
   // Convert newlines to <br> tags
@@ -233,7 +231,6 @@ document.addEventListener('selectionchange', () => {
   ipcRenderer.send('sync-selection', selection);
 });
 
-// Bold text selection on mouseup
 document.addEventListener('mouseup', () => {
   const selection = window.getSelection();
   if (selection.rangeCount > 0 && !selection.isCollapsed) {
@@ -260,7 +257,7 @@ document.addEventListener('mouseup', () => {
       range.insertNode(span);
     }
 
-    // Update the main process with the modified HTML
+    // Update main process with modified HTML
     const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
     if (selectedTitle) {
       const dictEl = selectedTitle.parentElement;

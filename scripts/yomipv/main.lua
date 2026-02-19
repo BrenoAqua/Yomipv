@@ -7,63 +7,42 @@ local utils = require("mp.utils")
 local yomipv_version = "0.1.0"
 mp.commandv("script-message", "yomipv-version", yomipv_version)
 
--- Package path for yomipv modules
 local script_dir = mp.get_script_directory()
 package.path = script_dir .. "/?.lua;" .. script_dir .. "/?/init.lua;" .. package.path
 
--- Load configuration
 local config = require("options")
-
--- Load library modules
 local Curl = require("lib.curl")
 local Player = require("lib.player")
 local Platform = require("lib.platform")
-
--- Load API clients
 local Yomitan = require("api.yomitan")
 local AnkiConnect = require("api.ankiconnect")
-
--- Load capture and monitoring
 local Monitor = require("capture.monitor")
 local Observer = require("subtitle.observer")
 local SubtitleFilter = require("subtitle.subtitle_filter")
 local SecondarySid = require("subtitle.secondary-sid")
-
--- Load interface components
 local Selector = require("interface.selector.selector")
 local History = require("interface.history.panel")
-
--- Load export components
 local Builder = require("export.builder")
 local Formatter = require("export.formatter")
 local Handler = require("export.handler")
-
--- Load media modules
 local Picture = require("media.picture")
 local Audio = require("media.audio")
 
 msg.info("Yomipv v" .. yomipv_version .. ": Initializing...")
 
--- Initialize API clients
 local yomitan = Yomitan.new(config, Curl)
 local anki = AnkiConnect.new(config, Curl)
 
--- Initialize media modules
 Picture.init(config)
 Audio.init(config)
-
--- Initialize Monitor
 Monitor.init(config)
 
--- Initialize export support
 local builder = Builder.new(config)
 local formatter = Formatter.new(config)
 
--- Initialize history panel
 local history = History:new()
 history:init(config)
 
--- Initialize export handler
 local handler = Handler:new()
 handler.config = config
 handler.deps = {
@@ -85,34 +64,25 @@ handler.deps = {
 	curl = Curl,
 }
 
--- Set handler reference for history
 history:set_exporter_handler(handler)
-
--- Initialize subtitle observer
 Observer.init(Monitor)
 Observer.start()
-
--- Initialize secondary subtitle handling
 SecondarySid.init(config)
-
--- Initialize subtitle filter
 SubtitleFilter.init(config)
 
--- Launch Electron app
 local function launch_lookup_app()
 	local app_path = config.lookup_app_path
 	if not app_path or app_path == "" then
 		return
 	end
 
-	-- Resolve absolute path if relative path provided
 	if not app_path:find(":") and not app_path:find("^/") then
 		app_path = utils.join_path(mp.get_script_directory(), app_path)
 	end
 
 	msg.info("Launching lookup app from: " .. app_path)
 
-	-- Check if process is running before launching
+	-- Check if process is running
 	mp.command_native_async({
 		name = "subprocess",
 		playback_only = false,
@@ -134,7 +104,6 @@ local function launch_lookup_app()
 		local mpv_pid = utils.getpid()
 		local ipc_pipe = mp.get_property("input-ipc-server")
 
-		-- Validate IPC pipe for platform
 		local function is_valid_pipe(pipe)
 			if not pipe or pipe == "" then
 				return false
@@ -169,7 +138,6 @@ end
 
 launch_lookup_app()
 
--- Register key bindings
 mp.add_key_binding(config.key_open_selector, "yomipv-export", function()
 	msg.info("Key pressed: " .. config.key_open_selector)
 	if not handler then
@@ -183,7 +151,6 @@ mp.add_key_binding(config.key_append_mode, "yomipv-toggle-append-mode", function
 	handler:toggle_mark_range()
 end)
 
--- Register history toggle if configured
 if config.selector_show_history then
 	mp.add_key_binding(config.key_toggle_history, "yomipv-toggle-history", function()
 		if history.active then
@@ -207,12 +174,19 @@ end)
 msg.info("Yomipv v" .. yomipv_version .. ": Initialized")
 Player.notify("Yomipv v" .. yomipv_version .. " loaded", "success", 2)
 
--- Shutdown lookup app on exit
 mp.add_hook("on_pre_shutdown", 50, function()
 	msg.info("Sending shutdown signal to lookup app")
 	mp.command_native_async({
 		name = "subprocess",
 		playback_only = false,
-		args = { Platform.get_curl_cmd(), "-s", "-X", "POST", "--connect-timeout", "1", "http://127.0.0.1:19634/shutdown" },
+		args = {
+			Platform.get_curl_cmd(),
+			"-s",
+			"-X",
+			"POST",
+			"--connect-timeout",
+			"1",
+			"http://127.0.0.1:19634/shutdown",
+		},
 	})
 end)

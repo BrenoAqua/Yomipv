@@ -10,7 +10,6 @@ local Platform = require("lib.platform")
 
 local Handler = {}
 
--- Module constants
 local DEFAULT_YOMITAN_FIELDS = {
 	"expression",
 	"reading",
@@ -29,7 +28,7 @@ local DEFAULT_YOMITAN_FIELDS = {
 local EXPANSION_TIMEOUT = 0.05
 
 -- Parse multiple handlebar names from config string
--- Supports formats: {handlebar1}{handlebar2} or handlebar1,handlebar2
+-- Supports: {h1}{h2} or h1,h2
 local function parse_handlebars(handlebar_string)
 	if not handlebar_string or handlebar_string == "" then
 		return {}
@@ -37,12 +36,10 @@ local function parse_handlebars(handlebar_string)
 
 	local handlebars = {}
 
-	-- Try Yomitan format: {handlebar1}{handlebar2}{handlebar3}
 	for handlebar in handlebar_string:gmatch("{([^}]+)}") do
 		table.insert(handlebars, handlebar)
 	end
 
-	-- Fallback to comma-separated or single value
 	if #handlebars == 0 then
 		for handlebar in handlebar_string:gmatch("[^,]+") do
 			local trimmed = handlebar:match("^%s*(.-)%s*$")
@@ -55,7 +52,6 @@ local function parse_handlebars(handlebar_string)
 	return handlebars
 end
 
--- Get field value from entry data structure
 local function get_field_value(entry, field_name)
 	if not entry or not field_name then
 		return nil
@@ -63,11 +59,10 @@ local function get_field_value(entry, field_name)
 	return entry[field_name]
 end
 
--- Split context sentence for cloze highlighting (supports surface/offset matching)
+-- Split context sentence for cloze highlighting
 local function split_cloze(context, target, surface, offset)
 	local start_idx, end_idx
 
-	-- Surface and offset matching
 	if surface and offset then
 		local sub = context:sub(offset + 1, offset + #surface)
 		if sub == surface then
@@ -75,12 +70,10 @@ local function split_cloze(context, target, surface, offset)
 		end
 	end
 
-	-- Fallback to searching surface form
 	if surface then
 		start_idx, end_idx = context:find(surface, 1, true)
 	end
 
-	-- Fallback to searching dictionary form
 	if not start_idx then
 		start_idx, end_idx = context:find(target, 1, true)
 	end
@@ -92,7 +85,6 @@ local function split_cloze(context, target, surface, offset)
 	end
 end
 
--- Format sentence HTML with primary highlight tag
 local function format_sentence_html(self, prefix, body, suffix, tag)
 	local closing_tag = tag:match("<(%w+)")
 	closing_tag = closing_tag and ("</" .. closing_tag .. ">") or "</span>"
@@ -100,7 +92,7 @@ local function format_sentence_html(self, prefix, body, suffix, tag)
 	return string.format(self.config.primary_sentence_wrapper, content)
 end
 
--- Merge raw subtitle content (prepend/append)
+-- Merge raw subtitle content for expansion
 local function merge_raw_content(existing, new_content, direction)
 	if not existing then
 		return new_content
@@ -125,16 +117,15 @@ local function merge_raw_content(existing, new_content, direction)
 		return merged
 	end
 end
--- Entry points
+
 function Handler:start_export(gui)
 	msg.info("Handler:start_export called")
 	local was_paused = mp.get_property_native("pause")
-	mp.set_property_native("pause", true) -- Pauses video immediately
+	mp.set_property_native("pause", true)
 
 	local status, err = pcall(function()
 		local context = self:initialize_export_context(gui)
 		if not context then
-			-- Cleanup if handled internally
 			if not was_paused then
 				mp.set_property_native("pause", false)
 			end
@@ -160,8 +151,7 @@ function Handler:toggle_mark_range()
 		self.deps.tracker.set_to_current_sub()
 	end
 end
--- Export flow steps
--- Initialize context for new export session
+
 function Handler:initialize_export_context(gui)
 	Player.notify("Yomitan: Initializing...")
 	msg.info("Starting Yomitan export flow")
@@ -174,7 +164,7 @@ function Handler:initialize_export_context(gui)
 	local primary = StringOps.clean_subtitle(sub and sub.primary_sid or "", true)
 
 	if not sub or primary == "" then
-		msg.info("No current session content, attempting to get last from history relative to timeline")
+		msg.info("No current session content, attempting to get last from history")
 		local history_subs = self.deps.tracker.get_synchronized_history()
 		local time_pos = mp.get_property_number("time-pos", 0)
 
@@ -189,7 +179,6 @@ function Handler:initialize_export_context(gui)
 				end
 			end
 
-			-- Secondary fallback: find first sub starting after current time
 			if not last_relevant then
 				for i = 1, #history_subs do
 					local entry = history_subs[i]
@@ -200,7 +189,6 @@ function Handler:initialize_export_context(gui)
 				end
 			end
 
-			-- Final fallback: absolute last
 			if not last_relevant then
 				last_relevant = history_subs[#history_subs]
 			end
@@ -245,7 +233,6 @@ function Handler:initialize_export_context(gui)
 	}
 end
 
--- Start interactive word selector flow
 function Handler:start_selector_flow(context, was_paused)
 	local hex_dump = ""
 	for i = 1, math.min(#context.current_subtitle_text, 20) do
@@ -272,9 +259,7 @@ function Handler:start_selector_flow(context, was_paused)
 	end)
 end
 
--- Open selector interface with provided tokens
 function Handler:open_selector(context, tokens, was_paused)
-	-- Selectable term verification
 	local has_term = false
 	for _, token in ipairs(tokens) do
 		if token.is_term then
@@ -303,9 +288,8 @@ function Handler:open_selector(context, tokens, was_paused)
 	end, selector_style)
 end
 
--- Process selector result and initiate field retrieval
 function Handler:handle_selector_result(context, selected_token)
-	self.expand_to_subtitle = nil -- Cleanup state
+	self.expand_to_subtitle = nil
 
 	if self.deps.history then
 		if self.config.selector_show_history and not context.history_was_open then
@@ -344,7 +328,6 @@ function Handler:handle_selector_result(context, selected_token)
 	end)
 end
 
--- Handle retrieved Anki fields and initiate media capture
 function Handler:handle_anki_fields_result(context, selected_token, data, error)
 	if error then
 		msg.error("Yomitan API error: " .. error)
@@ -357,13 +340,11 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 		return Player.notify("Error: No dictionary entry.", "warn", 2)
 	end
 
-	-- Manually inject selection if marker is missing or empty but we have a selection
 	if self.last_selection and (not entry["popup-selection-text"] or entry["popup-selection-text"] == "") then
 		msg.info("Manually injecting selection into popup-selection-text marker")
 		entry["popup-selection-text"] = self.last_selection
 	end
 
-	-- Log available markers in the entry for verification
 	local markers_found = {}
 	for k, _ in pairs(entry) do
 		table.insert(markers_found, k)
@@ -385,7 +366,6 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 	end)
 end
 
--- Capture picture and audio media for current context
 function Handler:capture_media(context, entry, data, picture, audio, selected_token)
 	msg.info("Starting media jobs")
 
@@ -395,7 +375,7 @@ function Handler:capture_media(context, entry, data, picture, audio, selected_to
 
 	local function on_job_finish(success)
 		if not success then
-			msg.warn("A media job failed, but proceeding with note creation")
+			msg.warn("A media job failed, but proceeding")
 		end
 		media_counter:decrease()
 	end
@@ -413,7 +393,6 @@ function Handler:capture_media(context, entry, data, picture, audio, selected_to
 	end
 end
 
--- Process fields and format HTML content for final note
 function Handler:process_note_content(context, entry, data, picture, audio, selected_token)
 	local note_fields = self.deps.builder:construct_note_fields(
 		context.sub.secondary_sid,
@@ -437,7 +416,6 @@ function Handler:process_note_content(context, entry, data, picture, audio, sele
 			format_sentence_html(self, cloze_prefix, cloze_body, cloze_suffix, self.config.sentence_highlight_tag)
 	end
 
-	-- Handling furigana
 	local sentence_furigana = get_field_value(entry, "sentence-furigana")
 	local furigana_key = self.config.sentence_furigana_field
 

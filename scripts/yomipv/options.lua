@@ -1,4 +1,4 @@
---[[ Default configuration options ]]
+--[[ Default options ]]
 
 local default_options = {
 
@@ -34,7 +34,7 @@ local default_options = {
 
 	-- State and behavior
 	update_if_exists = true, -- Update card and append media if term exists
-	-- Fields that are updated:
+	-- Updated fields:
 	-- sentence_field
 	-- sentence_furigana_field
 	-- secondary_sentence_field
@@ -65,21 +65,17 @@ local default_options = {
 
 	--[[ Media templates ]]
 
-	-- Audio template
 	audio_template = "[sound:%s]",
-
-	-- Image template
 	image_template = '<img src="%s" class="yomipv-image">',
 
-	--- Misc info settings
-
+	--[[ Misc info settings ]]
+	
 	-- {name} Sanitized title
 	-- {season} Season info
 	-- {episode} Episode info
 	-- {timestamp} Timestamp (HH:MM:SS)
 
 	-- Bullet logic (miscinfo_episode_bullet):
-	-- Adapts dynamically to {season} and {episode} presence
 	-- If both {season} and {episode}: Bullet matches {season}, comma separator added
 	-- If only {episode}: Bullet matches {episode}
 
@@ -100,7 +96,7 @@ local default_options = {
 	-- Target tags for exported notes
 	note_tag = "アニメ",
 
-	--[[] Picture settings ]]
+	--[[ Picture settings ]]
 
 	picture_use_ffmpeg = true, -- Use FFmpeg instead of MPV for extraction
 	picture_timestamp_source = "subtitle_start", -- Capture timing: subtitle_start, current_position
@@ -140,8 +136,8 @@ local default_options = {
 	selector_navigation_delay = 0.05, -- Input delay between repeated navigation actions
 
 	-- Lookup
-	selector_lookup_on_hover = false, -- Automatically show lookup when hovering over terms
-	selector_lookup_on_navigation = false, -- Automatically show lookup when navigating with keyboard
+	selector_lookup_on_hover = false, -- Automatically show lookup on hover
+	selector_lookup_on_navigation = false, -- Automatically show lookup on navigation
 
 	-- Typography
 	selector_font_name = "", -- Fallback to mpv sub-font if unset
