@@ -41,15 +41,23 @@ body {
 }
 
 #lookup-container {
+  position: relative;
   background-color: var(--bg-secondary);
-  padding: 12px 14px;
+  padding: 0;
   border-radius: var(--radius);
   border: 1px solid var(--border-color);
-  max-height: 380px;
-  overflow-y: auto;
+  height: 480px;
+  max-height: 480px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(12px);
+}
+
+#scroll-content {
+  overflow-y: auto;
+  padding: 12px 48px;
+  height: 100%;
 }
 
 #term-header {
@@ -57,7 +65,7 @@ body {
   line-height: 1.1;
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-start;
   gap: 12px;
 }
@@ -82,6 +90,7 @@ body {
 .header-frequencies {
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   padding-left: 12px;
+  padding-right: 36px;
   flex: 1;
 }
 
@@ -130,17 +139,23 @@ body {
 }
 
 /* Scrollbar styling */
-#lookup-container::-webkit-scrollbar {
+#scroll-content::-webkit-scrollbar {
   width: 5px;
 }
 
-#lookup-container::-webkit-scrollbar-track {
+#scroll-content::-webkit-scrollbar-track {
   background: transparent;
 }
 
-#lookup-container::-webkit-scrollbar-thumb {
+#scroll-content::-webkit-scrollbar-thumb {
   background: #444;
-  border-radius: 10px;
+  border-radius: 4px;
+}
+
+.highlight {
+  font-weight: 700;
+  color: var(--selection-color);
+  text-shadow: 0 0 8px rgba(86, 255, 104, 0.2);
 }
 
 /* Dictionary Header */
@@ -339,4 +354,54 @@ div[style*="border-left"] {
 .separator {
   opacity: 0.5;
   margin: 0 4px;
+}
+
+#entry-prev,
+#entry-next {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.15);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background-color 0.15s;
+  z-index: 10;
+}
+
+#entry-prev {
+  left: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+#entry-next {
+  right: 5px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+#entry-prev:hover,
+#entry-next:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+#entry-counter {
+  position: absolute;
+  top: 12px;
+  right: 56px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+  z-index: 11;
+  background-color: rgba(30,30,30,0.8);
+  padding: 2px 8px;
+  border-radius: 4px;
 }

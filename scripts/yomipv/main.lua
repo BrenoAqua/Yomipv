@@ -122,13 +122,18 @@ local function launch_lookup_app()
 			electron_ipc_pipe = "\\\\.\\pipe\\" .. electron_ipc_pipe
 		end
 
-		Platform.launch_electron_app(app_path, mpv_pid, electron_ipc_pipe, function(launch_success, _launch_result, launch_error)
-			if not launch_success then
-				msg.error("Failed to launch lookup app: " .. tostring(launch_error))
-			else
-				msg.info("Lookup app launch command sent")
+		Platform.launch_electron_app(
+			app_path,
+			mpv_pid,
+			electron_ipc_pipe,
+			function(launch_success, _launch_result, launch_error)
+				if not launch_success then
+					msg.error("Failed to launch lookup app: " .. tostring(launch_error))
+				else
+					msg.info("Lookup app launch command sent")
+				end
 			end
-		end)
+		)
 	end)
 end
 
@@ -165,6 +170,11 @@ end)
 mp.register_script_message("yomipv-dictionary-selected", function(text)
 	msg.info("Received dictionary selection")
 	handler:set_selected_dictionary(text)
+end)
+
+mp.register_script_message("yomipv-active-entry", function(expression, reading)
+	msg.info("Active entry: " .. tostring(expression) .. " / " .. tostring(reading))
+	handler:set_active_entry(expression, reading)
 end)
 
 msg.info("Yomipv v" .. yomipv_version .. ": Initialized")

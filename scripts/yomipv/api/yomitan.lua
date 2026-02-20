@@ -208,7 +208,7 @@ function Yomitan:tokenize_with_scan_length(text, scan_length, callback)
 	end, scan_length)
 end
 
-function Yomitan:get_anki_fields(term, markers, context, callback)
+function Yomitan:get_anki_fields(term, markers, context, callback, active_expression, active_reading)
 	local params = {
 		text = term,
 		type = "term",
@@ -219,7 +219,6 @@ function Yomitan:get_anki_fields(term, markers, context, callback)
 
 	if context then
 		params.context = context
-		-- Compatibility with various servers
 		if context.selection then
 			params.context.selectedText = context.selection
 		end
@@ -247,39 +246,53 @@ function Yomitan:get_anki_fields(term, markers, context, callback)
 			end
 
 			msg.info(string.format("Endpoint %s succeeded", endpoint))
+
 			local selected_entry = fields_list[1]
-			local best_score = -1
 
-			for _, entry in ipairs(fields_list) do
-				local score = 0
-				local expr = entry.expression or ""
-				local reading = entry.reading or ""
-				local pitch = entry["pitch-accents"] or ""
-
-				-- Align priority with lookup app
-				if pitch ~= "" then
-					score = score + 2
+			-- Skip scoring if entry was explicitly navigated to
+			if active_expression and active_expression ~= "" then
+				for _, entry in ipairs(fields_list) do
+					if
+						entry.expression == active_expression
+						and (not active_reading or active_reading == "" or entry.reading == active_reading)
+					then
+						selected_entry = entry
+						msg.info(string.format("Pinned entry by lookup selection: %s", active_expression))
+						break
+					end
 				end
-				if expr ~= reading then
-					score = score + 1
-				end
+			else
+				local best_score = -1
+				for _, entry in ipairs(fields_list) do
+					local score = 0
+					local expr = entry.expression or ""
+					local reading = entry.reading or ""
+					local pitch = entry["pitch-accents"] or ""
 
-				if score > best_score then
-					best_score = score
-					selected_entry = entry
-				end
+					-- Mirrors lookup app sort order for consistency
+					if pitch ~= "" then
+						score = score + 2
+					end
+					if expr ~= reading then
+						score = score + 1
+					end
 
-				if score == 3 and expr == term then
-					break
+					if score > best_score then
+						best_score = score
+						selected_entry = entry
+					end
+
+					if score == 3 and expr == term then
+						break
+					end
 				end
 			end
 
 			msg.info(
 				string.format(
-					"Selected entry: %s from %s (score: %d)",
+					"Selected entry: %s from %s",
 					selected_entry.expression or "nil",
-					selected_entry.dictionary or "unknown",
-					best_score
+					selected_entry.dictionary or "unknown"
 				)
 			)
 

@@ -7,8 +7,8 @@ let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 700,
-    height: 400,
+    width: 850,
+    height: 480,
     frame: false,
     transparent: true,
     show: false,
@@ -169,5 +169,12 @@ ipcMain.on('dictionary-selected', (event, content) => {
     mpvIpc.write(JSON.stringify(cmd) + '\n');
   } else {
     console.warn('[IPC] Cannot send dictionary selection: mpvIpc not connected');
+  }
+});
+
+ipcMain.on('active-entry', (event, data) => {
+  if (mpvIpc && data) {
+    const cmd = { command: ['script-message', 'yomipv-active-entry', data.expression || '', data.reading || ''] };
+    mpvIpc.write(JSON.stringify(cmd) + '\n');
   }
 });

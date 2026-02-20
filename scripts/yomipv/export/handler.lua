@@ -161,7 +161,6 @@ function Handler:initialize_export_context(gui)
 	local primary = StringOps.clean_subtitle(sub and sub.primary_sid or "", true)
 
 	if not sub or primary == "" then
-		msg.info("No current session content, attempting to get last from history")
 		local history_subs = self.deps.tracker.get_synchronized_history()
 		local time_pos = mp.get_property_number("time-pos", 0)
 
@@ -321,7 +320,7 @@ function Handler:handle_selector_result(context, selected_token)
 		["end"] = selected_token.offset + selected_token.text:len(),
 	}, function(data, error)
 		self:handle_anki_fields_result(context, selected_token, data, error)
-	end)
+	end, self.active_entry_expression, self.active_entry_reading)
 end
 
 function Handler:handle_anki_fields_result(context, selected_token, data, error)
@@ -336,9 +335,8 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 		return Player.notify("Error: No dictionary entry.", "warn", 2)
 	end
 
-	-- Inject selection if Yomitan doesn't provide it automatically
+	-- Inject selection if Yomitan marker is missing
 	if self.last_selection and (not entry["popup-selection-text"] or entry["popup-selection-text"] == "") then
-		msg.info("Manually injecting selection into popup-selection-text marker")
 		entry["popup-selection-text"] = self.last_selection
 	end
 
@@ -431,7 +429,7 @@ function Handler:process_note_content(context, entry, data, picture, audio, sele
 end
 
 function Handler:finalize_and_save_note(context, note_fields, entry, data)
-	-- Preference selected dictionary to manual selections
+	-- Preference selected dictionary over manual selections
 	if self.selected_dictionary then
 		entry["selected-dict"] = self.selected_dictionary
 		entry["popup-selection-text"] = nil
@@ -460,6 +458,7 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 	set_field(self.config.freq_field, get_field_value(entry, "frequencies"))
 	set_field(self.config.freq_sort_field, get_field_value(entry, "frequency-harmonic-rank"))
 
+	-- Senren-specific field handling
 	if self.config.note_type and self.config.note_type:find("Senren") then
 		set_field(self.config.dictionary_pref_field, self.config.dictionary_pref_value)
 	end
@@ -504,6 +503,7 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 	process_handlebars(self.config.glossary_handlebar, self.config.glossary_field)
 	process_handlebars(self.config.selection_text_handlebar, self.config.selection_text_field)
 
+	-- Handle expression audio if present
 	if entry.audio and not Collections.is_void(self.config.expression_audio_field) then
 		note_fields[self.config.expression_audio_field] = entry.audio
 	end
@@ -676,6 +676,8 @@ function Handler:build_selector_style(update_range_fn, was_paused)
 		end,
 		on_lookup = function(data)
 			self.selected_dictionary = nil
+			self.active_entry_expression = nil
+			self.active_entry_reading = nil
 			local data_to_send = {
 				term = data.term,
 				reading = data.reading,
@@ -808,12 +810,19 @@ function Handler:set_selected_dictionary(text)
 	msg.info("Handler: Selected dictionary updated")
 end
 
+function Handler:set_active_entry(expression, reading)
+	self.active_entry_expression = expression ~= "" and expression or nil
+	self.active_entry_reading = reading ~= "" and reading or nil
+end
+
 function Handler:new()
 	local obj = {
 		config = nil,
 		deps = nil,
 		expand_to_subtitle = nil,
 		last_selection = nil,
+		active_entry_expression = nil,
+		active_entry_reading = nil,
 	}
 	setmetatable(obj, self)
 	self.__index = self
@@ -852,11 +861,34 @@ end
 
 function Handler:handle_duplicate_note(note_fields, _error_msg)
 	local expression = note_fields[self.config.expression_field]
+	local reading = note_fields[self.config.reading_field]
+	local pitch_accents = note_fields[self.config.pitch_accents_field]
+
 	if not expression then
 		return Player.notify("Cannot update: no expression field", "error", 3)
 	end
 
-	self.deps.anki:find_notes(expression, function(note_ids, error)
+	-- Extract plain kana from pitch accent spans as fallback
+	if (not reading or reading == "") and pitch_accents and pitch_accents ~= "" then
+		local first_li = pitch_accents:match("<li.->(.-)</li>")
+		if first_li then
+			local extracted = first_li:gsub("<[^>]+>", "")
+			if extracted and extracted ~= "" then
+				reading = extracted
+				msg.info("Extracted fallback reading from pitch accents: " .. reading)
+			end
+		end
+	end
+
+	-- Quote values to force exact field matching
+	local query = string.format('%s:"%s"', self.config.expression_field, expression)
+	if reading and reading ~= "" then
+		query = query .. string.format(' %s:"%s"', self.config.reading_field, reading)
+	end
+
+	msg.info("Duplicate search query: " .. query)
+
+	self.deps.anki:find_notes(query, function(note_ids, error)
 		if error or not note_ids or #note_ids == 0 then
 			return Player.notify("Cannot find existing note", "error", 3)
 		end
