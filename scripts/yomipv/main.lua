@@ -143,8 +143,8 @@ end
 
 launch_lookup_app()
 
-mp.add_key_binding(config.key_toggle_substitute, "yomipv-toggle-substitute", function()
-	handler:toggle_substitute()
+mp.add_key_binding(config.key_toggle_colorizer, "yomipv-toggle-colorizer", function()
+	handler:toggle_colorizer()
 end)
 
 mp.add_key_binding(config.key_open_selector, "yomipv-export", function()

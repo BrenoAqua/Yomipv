@@ -142,7 +142,6 @@ local default_options = {
 	--[[ Selector settings ]]
 
 	-- Behavior
-	substitute_mpv_subtitles = false,
 	selector_show_history = true, -- Include recent lines in selector view
 	selector_hide_ui = true, -- Hide player UI while selector is active
 	selector_navigation_delay = 0.05, -- Input delay between repeated navigation actions
@@ -150,6 +149,7 @@ local default_options = {
 	selector_trigger_mouse_idle_time = 5.0, -- Seconds mouse must be idle before movement triggers selector
 
 	-- Colorizer
+	colorizer_enabled = false,
 	selector_colorize_words = false,
 	selector_colorize_underline = false,
 
@@ -191,7 +191,7 @@ local default_options = {
 	selector_max_width_factor = 0.9, -- Max text block width relative to OSD width
 
 	-- Keybindings
-	key_toggle_substitute = "S",
+	key_toggle_colorizer = "S",
 	key_open_selector = "c",
 	key_selector_confirm = "ENTER,c",
 	key_selector_cancel = "ESC",

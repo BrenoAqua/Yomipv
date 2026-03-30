@@ -842,7 +842,7 @@ end
 
 function Handler:on_current_tokens_ready(tokens)
 	self.current_tokens = tokens
-	if not self.config.substitute_mpv_subtitles then
+	if not self.config.colorizer_enabled then
 		return
 	end
 
@@ -861,7 +861,7 @@ end
 
 function Handler:clear_passive()
 	self.current_tokens = nil
-	if not self.config.substitute_mpv_subtitles then
+	if not self.config.colorizer_enabled then
 		return
 	end
 	self.deps.selector:clear_passive()
@@ -1126,23 +1126,22 @@ function Handler:new()
 end
 
 function Handler:init()
-	if self.config.substitute_mpv_subtitles then
+	if self.config.colorizer_enabled then
 		mp.set_property("sub-visibility", "no")
 	end
 end
 
-function Handler:toggle_substitute()
-	self.config.substitute_mpv_subtitles = not self.config.substitute_mpv_subtitles
-	self.config.save("substitute_mpv_subtitles", self.config.substitute_mpv_subtitles)
-	if self.config.substitute_mpv_subtitles then
-		Player.notify("Substitution: Enabled", "info", 2)
+function Handler:toggle_colorizer()
+	self.config.colorizer_enabled = not self.config.colorizer_enabled
+	self.config.save("colorizer_enabled", self.config.colorizer_enabled)
+	if self.config.colorizer_enabled then
+		Player.notify("Colorizer: Enabled", "info", 2)
 		mp.set_property("sub-visibility", "no")
 		local sub = self.deps.tracker.export_current_session()
 		if sub and sub.primary_sid and sub.primary_sid ~= "" then
-			local StringOps = require("lib.string_ops")
 			local cleaned = StringOps.clean_subtitle(sub.primary_sid, true)
 			self.deps.yomitan:tokenize(cleaned, function(tokens)
-				if self.config.substitute_mpv_subtitles then
+				if self.config.colorizer_enabled then
 					self:on_current_tokens_ready(tokens)
 				end
 			end)
@@ -1150,7 +1149,7 @@ function Handler:toggle_substitute()
 			self.deps.selector:clear_passive()
 		end
 	else
-		Player.notify("Substitution: Disabled", "info", 2)
+		Player.notify("Colorizer: Disabled", "info", 2)
 		mp.set_property("sub-visibility", "yes")
 		self.deps.selector:clear_passive()
 	end

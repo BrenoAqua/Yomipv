@@ -21,6 +21,9 @@ To enable and customize the colorizer, modify your `script-opts/yomipv.conf` fil
 
 ```ini
 # Enable the colorizer
+colorizer_enabled=yes
+
+# Colorize the words
 selector_colorize_words=yes
 
 # Add an underline and colorize it instead of the text

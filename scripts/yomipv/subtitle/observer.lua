@@ -31,8 +31,8 @@ function Observer.handle_subtitle_change(name, value)
 	local StringOps = require("lib.string_ops")
 	local cleaned = StringOps.clean_subtitle(text, true)
 
-	-- Immediate display update for substitution mode
-	if Observer.config and Observer.config.substitute_mpv_subtitles and Observer.yomitan and name == "sub-text" then
+	-- Immediate display update for colorizer mode
+	if Observer.config and Observer.config.colorizer_enabled and Observer.yomitan and name == "sub-text" then
 		if not cleaned or cleaned == "" then
 			if Observer.handler and Observer.handler.clear_passive then
 				Observer.handler:clear_passive()
@@ -90,7 +90,7 @@ function Observer.handle_subtitle_change(name, value)
 		local stable_cleaned = StringOps.clean_subtitle(current_text, true)
 		if stable_cleaned and stable_cleaned ~= "" then
 			Observer.yomitan:tokenize(stable_cleaned, function()
-				-- Already handled by immediate update if substitution is on
+				-- Already handled by immediate update if colorizer is on
 			end)
 		end
 
