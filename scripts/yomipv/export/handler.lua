@@ -1137,8 +1137,17 @@ function Handler:toggle_substitute()
 	if self.config.substitute_mpv_subtitles then
 		Player.notify("Substitution: Enabled", "info", 2)
 		mp.set_property("sub-visibility", "no")
-		if self.current_tokens then
-			self:on_current_tokens_ready(self.current_tokens)
+		local sub = self.deps.tracker.export_current_session()
+		if sub and sub.primary_sid and sub.primary_sid ~= "" then
+			local StringOps = require("lib.string_ops")
+			local cleaned = StringOps.clean_subtitle(sub.primary_sid, true)
+			self.deps.yomitan:tokenize(cleaned, function(tokens)
+				if self.config.substitute_mpv_subtitles then
+					self:on_current_tokens_ready(tokens)
+				end
+			end)
+		else
+			self.deps.selector:clear_passive()
 		end
 	else
 		Player.notify("Substitution: Disabled", "info", 2)
