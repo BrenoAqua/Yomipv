@@ -40,6 +40,13 @@
       ],
       "icon": "build/lookup-app.png",
       "artifactName": "${productName}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/lookup-app.png",
+      "artifactName": "mac-${productName}-${version}.${ext}"
     }
   }
 }

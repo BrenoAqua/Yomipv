@@ -82,7 +82,15 @@ function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
 	end
 
 	local root_dir = mp.get_script_directory() .. "/"
-	local binary_path = Platform.normalize_path(utils.join_path(root_dir, binary_name))
+	local binary_path
+
+	if Platform.IS_MACOS then
+		-- Resolve executable paths within .app bundles
+		local app_bundle = Platform.normalize_path(utils.join_path(root_dir, "YomipvLookup.app"))
+		binary_path = app_bundle .. "/Contents/MacOS/YomipvLookup"
+	else
+		binary_path = Platform.normalize_path(utils.join_path(root_dir, binary_name))
+	end
 
 	local function file_exists(name)
 		local f = io.open(name, "r")

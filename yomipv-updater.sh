@@ -3,7 +3,6 @@
 # Configuration
 REPO="BrenoAqua/Yomipv"
 API_URL="https://api.github.com/repos/$REPO/releases/latest"
-USER_AGENT="Yomipv-Updater-Linux"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Colors
@@ -14,7 +13,17 @@ MAGENTA='\033[0;35m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${CYAN}Yomipv Linux Updater${NC}"
+OS_TYPE="$(uname -s)"
+if [ "$OS_TYPE" = "Darwin" ]; then
+    USER_AGENT="Yomipv-Updater-macOS"
+    # BSD sed requires explicit extension argument for in-place edits
+    SED_INPLACE_ARG="''"
+else
+    USER_AGENT="Yomipv-Updater-Linux"
+    SED_INPLACE_ARG=""
+fi
+
+echo -e "${CYAN}Yomipv Updater${NC}"
 
 # Check dependencies
 for cmd in curl unzip grep sed; do
@@ -77,7 +86,7 @@ merge_config() {
             if [ -n "$key" ]; then
                 if grep -q "^\s*#\?\s*$key\s*=" "$conf_file"; then
                     local escaped_val=$(echo "$value" | sed 's/[&/\]/\\&/g')
-                    sed -i "0,/^\s*#\?\s*$key\s*=/ s|^\s*#\?\(\s*$key\s*=\s*\).*|\1$escaped_val|" "$conf_file"
+                    sed -i ${SED_INPLACE_ARG} "0,/^\s*#\?\s*$key\s*=/ s|^\s*#\?\(\s*$key\s*=\s*\).*|\1$escaped_val|" "$conf_file"
                 else
                     echo "$key=$value" >> "$conf_file"
                 fi
@@ -191,8 +200,11 @@ fi
 
 echo -e "${GREEN}Newer Yomipv build available -- v$LATEST_VER${NC}"
 
-# Find the Linux zip
-ZIP_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/[^"]*linux-yomipv-[^"]*\.zip' | head -n 1)
+if [ "$OS_TYPE" = "Darwin" ]; then
+    ZIP_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/[^"]*mac-yomipv-[^"]*\.zip' | head -n 1)
+else
+    ZIP_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/[^"]*linux-yomipv-[^"]*\.zip' | head -n 1)
+fi
 
 if [ -z "$ZIP_URL" ]; then
     ZIP_URL=$(echo "$RELEASE_JSON" | grep -o 'https://github.com/[^"]*\.zip' | grep -v "win-" | head -n 1)

@@ -18,10 +18,11 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 ## Installation
 
 ### Recommended
-1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.7/win-yomipv-v0.3.7.zip) or [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.7/linux-yomipv-v0.3.7.zip)
+1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.7/win-yomipv-v0.3.7.zip), [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.7/linux-yomipv-v0.3.7.zip), or [macOS DMG](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.7/mac-yomipv-v0.3.7.dmg)
 2. Extract the contents directly into your MPV directory:
     - Windows: `%APPDATA%/mpv/`
     - Linux: `~/.config/mpv/`
+    - macOS: `~/.config/mpv/`
 
 ### Alternative (Requires Node.js)
 1. **Clone the repository** to your MPV directory and install dependencies **(make sure you have Node.js installed)**:
@@ -31,6 +32,11 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
      ```
    
    - Linux: `~/.config/mpv/`
+     ```
+     git clone https://github.com/BrenoAqua/Yomipv && cp -rn Yomipv/* . && rm -rf Yomipv && cd scripts/yomipv/lookup-app && npm install
+     ```
+
+   - macOS: `~/.config/mpv/`
      ```
      git clone https://github.com/BrenoAqua/Yomipv && cp -rn Yomipv/* . && rm -rf Yomipv && cd scripts/yomipv/lookup-app && npm install
      ```
@@ -103,7 +109,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - **Auto-Updater (`U`)**: Keeps Yomipv updated to the latest version
   - Press **`U`** in MPV to trigger the update, or:
     - On Windows: Run **`yomipv-updater.bat`** directly
-    - On Linux: Run **`yomipv-updater.sh`** directly
+    - On Linux / macOS: Run **`yomipv-updater.sh`** directly
   - Choose between latest official releases or latest source (main branch)
   - Automatically preserves user configuration in `script-opts/yomipv.conf`
   - Downloads platform-specific binaries for the Lookup App
@@ -120,3 +126,9 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - Ensure `curl`, `unzip`, `grep`, and `sed` are installed
 - Ensure the updater script has execute permissions: `chmod +x yomipv-updater.sh`
 - For the lookup app, ensure the binary in `scripts/yomipv/` has execution permissions
+
+### macOS
+- Ensure `curl`, `unzip`, `grep`, and `sed` are installed
+- Ensure the updater script has execute permissions: `chmod +x yomipv-updater.sh`
+- If macOS blocks the Lookup App with a Gatekeeper warning, run: `xattr -cr scripts/yomipv/YomipvLookup.app`
+- MPV config directory: `~/.config/mpv/` (create it if it does not exist)

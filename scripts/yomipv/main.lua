@@ -308,22 +308,40 @@ local function launch_updater()
 		return
 	end
 
-	local is_windows = package.config:sub(1,1) == "\\"
 	local root_dir = utils.join_path(script_dir, "../../")
-	local updater_path = utils.join_path(root_dir, "yomipv-updater.bat")
+	local args
 
-	if is_windows then
-		updater_path = updater_path:gsub("/", "\\")
+	if Platform.IS_WINDOWS then
+		local updater_path = Platform.normalize_path(utils.join_path(root_dir, "yomipv-updater.bat"))
+		args = { "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+			"Start-Process", '"' .. updater_path .. '"', "-Verb", "RunAs" }
+	else
+		local updater_path = utils.join_path(root_dir, "yomipv-updater.sh")
+		mp.command_native_async({
+			name = "subprocess",
+			playback_only = false,
+			args = { "chmod", "+x", updater_path },
+		}, function()
+			mp.command_native_async({
+				name = "subprocess",
+				playback_only = false,
+				detach = true,
+				args = { "/bin/bash", updater_path },
+			}, function(success, _result, err)
+				if not success then
+					msg.error("Failed to launch updater: " .. tostring(err))
+					Player.notify("Failed to launch updater", "error")
+				end
+			end)
+		end)
+		msg.info("Launching updater: " .. updater_path)
+		Player.notify("Checking for updates...", "info", 5)
+		return
 	end
 
+	local updater_path = Platform.normalize_path(utils.join_path(root_dir, "yomipv-updater.bat"))
 	msg.info("Launching updater: " .. updater_path)
 	Player.notify("Checking for updates...", "info", 5)
-
-	local args = { "cmd.exe", "/c", updater_path }
-	if is_windows then
-		-- Start batch file as admin using powershell
-		args = { "powershell.exe", "-NoProfile", "-Command", "Start-Process", '"' .. updater_path .. '"', "-Verb", "RunAs" }
-	end
 
 	mp.command_native_async({
 		name = "subprocess",

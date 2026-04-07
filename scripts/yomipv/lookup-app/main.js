@@ -28,6 +28,9 @@ function createWindow() {
 
   mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (process.platform === 'darwin') {
+    mainWindow.setWindowButtonVisibility(false);
+  }
   mainWindow.loadFile('index.html');
   mainWindow.webContents.on('context-menu', (e) => {
     e.preventDefault();
