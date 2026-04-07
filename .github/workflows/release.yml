@@ -82,8 +82,45 @@ jobs:
           name: yomipv-lookup-linux
           path: scripts/yomipv/lookup-app/dist/*.AppImage
 
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          
+      - name: Set Version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          cd scripts/yomipv/lookup-app
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          cd ../../../
+          sed -i '' "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
+          sed -i '' "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
+          
+      - name: Install Dependencies
+        working-directory: scripts/yomipv/lookup-app
+        run: npm install
+        
+      - name: Build macOS Binaries
+        working-directory: scripts/yomipv/lookup-app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac dir --x64 --publish never
+        
+      - name: Upload macOS Asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: yomipv-lookup-macos
+          path: scripts/yomipv/lookup-app/dist/mac*/YomipvLookup.app
+
   create-release:
-    needs: [build-windows, build-linux]
+    needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -113,6 +150,12 @@ jobs:
           name: yomipv-lookup-linux
           path: bin-linux
           
+      - name: Download macOS Asset
+        uses: actions/download-artifact@v4
+        with:
+          name: yomipv-lookup-macos
+          path: bin-macos/YomipvLookup.app
+          
       - name: Create Zip Archive
         run: |
           mkdir common-bundle
@@ -136,6 +179,14 @@ jobs:
           zip -r ../linux-yomipv-${{ github.ref_name }}.zip ./*
           cd ..
           
+          # Create macOS bundle
+          cp -r common-bundle macos-bundle
+          cp -r bin-macos/YomipvLookup.app macos-bundle/scripts/yomipv/ || true
+          cp yomipv-updater.sh macos-bundle/ 2>/dev/null || true
+          cd macos-bundle
+          zip -r ../mac-yomipv-${{ github.ref_name }}.zip ./*
+          cd ..
+          
       - name: Generate Release Notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -157,7 +208,7 @@ jobs:
 
           ### Installation
 
-          1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/win-yomipv-${{ github.ref_name }}.zip) or [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/linux-yomipv-${{ github.ref_name }}.zip).
+          1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/win-yomipv-${{ github.ref_name }}.zip), [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/linux-yomipv-${{ github.ref_name }}.zip), or [macOS Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/mac-yomipv-${{ github.ref_name }}.zip).
           2. Extract the contents directly into your MPV directory:
               - Windows: \`%APPDATA%/mpv/\`
               - Linux: \`~/.config/mpv/\`
@@ -171,6 +222,7 @@ jobs:
           files: |
             win-yomipv-${{ github.ref_name }}.zip
             linux-yomipv-${{ github.ref_name }}.zip
+            mac-yomipv-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
