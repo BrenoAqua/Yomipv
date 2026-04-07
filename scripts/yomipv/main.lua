@@ -4,7 +4,7 @@ local mp = require("mp")
 local msg = require("mp.msg")
 local utils = require("mp.utils")
 
-local yomipv_version = "0.3.7"
+local yomipv_version = "0.4.0-test"
 mp.commandv("script-message", "yomipv-version", yomipv_version)
 
 local script_dir = mp.get_script_directory()
