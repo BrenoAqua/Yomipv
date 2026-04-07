@@ -383,7 +383,6 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 				end
 			end
 
-			local term_is_katakana = is_katakana_only(term)
 			local term_is_hiragana = is_hiragana_only(term)
 			local term_cps = match_sort.to_normalized_codepoints(term)
 
@@ -398,35 +397,45 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 				local expr = entry.expression or ""
 				local reading = entry.reading or ""
 
-				-- Katakana priority
-				if term_is_katakana and expr == term then
-					score = score + 1000000
+				local clean_term = term:gsub("^[%s\226\128\139]+", "") -- remove leading spaces and ZWSP (\u200B)
+
+				-- Exact-match priority
+				if expr == clean_term then
+					score = score + 10000000
 				end
 
-				-- Hiragana priority
-				if self.config.prioritize_hiragana_match and term_is_hiragana and expr == term then
-					score = score + 1000000
+				-- Hiragana exact-match priority
+				if self.config.prioritize_hiragana_match and term_is_hiragana and expr == clean_term then
+					score = score + 10000000
 				end
 
 				-- Primary: characters consumed by Yomitan's deinflection
 				local orig_len = get_orig_len(entry)
-				score = score + (orig_len * 10000)
+				score = score + (orig_len * 100000)
+
+				-- Katakana priority when matched prefix is Katakana
+				local term_kata_prefix = clean_term:match("^[\227\130\160-\227\131\191]+") -- U+30A0 to U+30FF
+				if term_kata_prefix and #term_kata_prefix > 0 then
+					if is_katakana_only(expr) then
+						score = score + 10000
+					end
+				end
 
 				-- Fallback: kana prefix-match length
 				local matched = match_sort.compute_matched_len(term_cps, expr, reading)
 
 				if not self.config.prioritize_kanji_match then
 					-- Matched-length priority (common prefix with term, kana-normalized)
-					score = score + (matched * 1000)
+					score = score + (matched * 100)
 
 					-- Kanji priority
 					if expr ~= reading and reading ~= "" then
-						score = score + 100
+						score = score + 10
 					end
 				else
 					-- Kanji priority
 					if expr ~= reading and reading ~= "" then
-						score = score + 100
+						score = score + 10
 					end
 
 					-- Fallback to matched length

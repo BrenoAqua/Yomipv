@@ -26,12 +26,15 @@ function M.to_normalized_codepoints(s)
 		if b < 0x80 then
 			cp, size = b, 1
 		elseif b < 0xE0 then
+			if i + 1 > len then break end
 			cp = (b - 0xC0) * 64 + (s:byte(i + 1) - 0x80)
 			size = 2
 		elseif b < 0xF0 then
+			if i + 2 > len then break end
 			cp = (b - 0xE0) * 4096 + (s:byte(i + 1) - 0x80) * 64 + (s:byte(i + 2) - 0x80)
 			size = 3
 		else
+			if i + 3 > len then break end
 			cp = (b - 0xF0) * 262144 + (s:byte(i + 1) - 0x80) * 4096 + (s:byte(i + 2) - 0x80) * 64 + (s:byte(i + 3) - 0x80)
 			size = 4
 		end

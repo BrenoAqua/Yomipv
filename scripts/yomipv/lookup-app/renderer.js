@@ -19,46 +19,6 @@ let currentPrioritizeKanjiMatch = false;
 let currentPrioritizeHiraganaMatch = false;
 let currentShowPitchAccents = true;
 
-const filterDictionaryStyles = (styleEl, dictName) => {
-  if (!styleEl || !styleEl.sheet || !styleEl.sheet.cssRules || styleEl.sheet.cssRules.length === 0) return '';
-  try {
-    const filterRules = (rules) => {
-      let cssText = '';
-      for (let i = 0; i < rules.length; i++) {
-        const rule = rules[i];
-
-        if (rule.type === CSSRule.STYLE_RULE) {
-          const match = rule.selectorText && rule.selectorText.match(/\[data-dictionary=["']?([^\]"']+)["']?\]/);
-          if (match) {
-            if (match[1] === dictName) {
-              cssText += rule.cssText + '\n';
-            }
-          } else if (rule.cssRules && rule.cssRules.length > 0) {
-            const innerText = filterRules(rule.cssRules);
-            if (innerText.trim().length > 0) {
-              cssText += `${rule.selectorText} {\n${innerText}}\n`;
-            }
-          }
-        } else if (rule.type === CSSRule.KEYFRAMES_RULE || rule.type === CSSRule.FONT_FACE_RULE) {
-          cssText += rule.cssText + '\n';
-        } else if (rule.type === CSSRule.SUPPORTS_RULE && rule.cssRules) {
-          const innerText = filterRules(rule.cssRules);
-          if (innerText.trim().length > 0) {
-            cssText += `@supports ${rule.conditionText} {\n${innerText}}\n`;
-          }
-        }
-      }
-      return cssText;
-    };
-    const filteredCss = filterRules(styleEl.sheet.cssRules);
-    if (!filteredCss.trim()) return '';
-    return `<style>${filteredCss.replace(/\n+/g, ' ')}</style>`;
-  } catch (e) {
-    console.error('[UI] Failed to filter styles:', e);
-    return '';
-  }
-};
-
 const renderHeader = (term, reading, frequencies) => {
   const cleanTerm = (term || '').trim();
 
@@ -279,6 +239,7 @@ const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents) => {
   glossaryEl.querySelectorAll('[data-dictionary]').forEach(el => {
     const titleEl = el.firstElementChild;
     if (titleEl) {
+      titleEl.dataset.originalTitle = titleEl.textContent;
       titleEl.textContent = titleEl.textContent.replace(/[()]/g, '').trim();
     }
   });
@@ -318,14 +279,37 @@ const sendSelectedDict = (el) => {
     img.removeAttribute('data-anki-src');
   });
 
-  const dictionaryHtml = exportEl.outerHTML;
-
-  let styleHtml = '';
-  glossaryEl.querySelectorAll('style').forEach(styleEl => {
-    styleHtml += filterDictionaryStyles(styleEl, dictName);
+  // Remove inline style properties injected by the lookup UI
+  exportEl.querySelectorAll('a, [data-link]').forEach(link => {
+    link.style.removeProperty('pointer-events');
+    link.style.removeProperty('cursor');
+    if (!link.style.cssText) link.removeAttribute('style');
+  });
+  const exportTitle = exportEl.firstElementChild;
+  if (exportTitle) {
+    if (exportTitle.dataset.originalTitle) {
+      exportTitle.textContent = exportTitle.dataset.originalTitle;
+      exportTitle.removeAttribute('data-original-title');
+    }
+    exportTitle.classList.remove('selected');
+    exportTitle.style.removeProperty('cursor');
+    if (!exportTitle.style.cssText) exportTitle.removeAttribute('style');
+  }
+  exportEl.querySelectorAll('li').forEach(li => {
+    li.style.removeProperty('list-style');
+    if (!li.style.cssText) li.removeAttribute('style');
   });
 
-  const dictContent = `<div class="yomitan-glossary" style="text-align: left;"><ol>${dictionaryHtml}</ol></div>${styleHtml}`;
+  const dictionaryHtml = exportEl.outerHTML;
+
+  // Each dictionary's <style> block selectors reference its own name, so a text match is sufficient
+  let styleHtml = '';
+  glossaryEl.querySelectorAll('style').forEach(styleEl => {
+    const css = styleEl.textContent.trim();
+    if (css && css.includes(dictName)) styleHtml += `<style>${css}</style>`;
+  });
+
+  const dictContent = `<div style="text-align: left;" class="yomitan-glossary"><ol>${dictionaryHtml}${styleHtml}</ol></div>`;
   console.log('[UI] Dictionary selected:', dictName);
   ipcRenderer.send('dictionary-selected', dictContent);
 };
@@ -498,7 +482,6 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       }
     } catch (_) { /* non-critical; fall back to prefix-match sort */ }
 
-    const isKatakanaOnly = /^[\u30A0-\u30FF]+$/.test(term);
     const isHiraganaOnly = /^[\u3041-\u309F]+$/.test(term);
     const termChars = toNormalizedChars(term);
 
@@ -514,12 +497,12 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       const exprA = fa.expression || '';
       const exprB = fb.expression || '';
 
-      // Katakana exact-match priority
-      if (isKatakanaOnly) {
-        const exactA = exprA === term ? 1 : 0;
-        const exactB = exprB === term ? 1 : 0;
-        if (exactA !== exactB) return exactB - exactA;
-      }
+      const cleanSortTerm = term.replace(/^[\s\u200B]+/, '');
+      
+      // Exact-match priority
+      const exactA = exprA === cleanSortTerm ? 1 : 0;
+      const exactB = exprB === cleanSortTerm ? 1 : 0;
+      if (exactA !== exactB) return exactB - exactA;
 
       // Hiragana exact-match priority
       if (currentPrioritizeHiraganaMatch && isHiraganaOnly) {
@@ -533,6 +516,16 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
       // Prefer the entry whose deinflection consumed more of the original text
       if (origA !== origB) return origB - origA;
+
+      // Katakana priority when matched prefix is Katakana
+      let isKataA = 0;
+      let isKataB = 0;
+      const termKataPrefixMatch = cleanSortTerm.match(/^[\u30A0-\u30FF]+/);
+      if (termKataPrefixMatch && termKataPrefixMatch[0].length > 0) {
+        isKataA = /^[\u30A0-\u30FF]+$/.test(exprA) ? 1 : 0;
+        isKataB = /^[\u30A0-\u30FF]+$/.test(exprB) ? 1 : 0;
+      }
+      if (isKataA !== isKataB) return isKataB - isKataA;
 
       // Fall back to kana prefix-match when termEntries gave the same (or no) length
       const lenA = computeMatchedLen(termChars, exprA, fa.reading || '');
@@ -688,6 +681,10 @@ document.addEventListener('mouseup', () => {
   const range = selection.getRangeAt(0);
   if (!glossaryEl.contains(range.commonAncestorContainer)) return;
 
+  // Resolve before any DOM mutation so extractContents can't displace it
+  const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
+  const targetDict = selectedTitle?.parentElement;
+
   const startRuby = range.startContainer.parentElement?.closest('ruby');
   const endRuby = range.endContainer.parentElement?.closest('ruby');
 
@@ -712,8 +709,6 @@ document.addEventListener('mouseup', () => {
     }
   }
 
-  const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
-  if (selectedTitle) {
-    sendSelectedDict(selectedTitle.parentElement);
-  }
+  if (targetDict) sendSelectedDict(targetDict);
 });
+

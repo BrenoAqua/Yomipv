@@ -27,7 +27,6 @@ local Selector = {
 	persistent_mode = false,
 }
 
-
 function Selector.utf8_codes(str)
 	return StringOps.utf8_codes(str)
 end
@@ -180,12 +179,16 @@ function Selector:expand_selection_to_match(expression, reading)
 	local expr_len = StringOps.get_char_count(expr_no_space)
 	local read_len = StringOps.get_char_count(read_no_space)
 
-	for i = 0, #self.tokens - self.index do
-		local t = self.tokens[self.index + i]
+	-- Use the locked index as the anchor when locked, otherwise use the current index
+	local base_index = (self.lookup_locked and self.locked_index) or self.index
+	local base_mora = (self.lookup_locked and self.locked_mora_index) or self.mora_index
+
+	for i = 0, #self.tokens - base_index do
+		local t = self.tokens[base_index + i]
 		if t then
 			local tk_text = t.text
-			if i == 0 and self.mora_index and self.mora_index > 1 then
-				local byte_pos = StringOps.get_char_byte_pos(tk_text, self.mora_index)
+			if i == 0 and base_mora and base_mora > 1 then
+				local byte_pos = StringOps.get_char_byte_pos(tk_text, base_mora)
 				tk_text = tk_text:sub(byte_pos)
 			end
 
@@ -216,7 +219,6 @@ function Selector:expand_selection_to_match(expression, reading)
 			end
 
 			-- Conjugation fallback: match all but final character
-			-- Guard: only fire when enough morae have accumulated to represent a conjugated form
 			if combined_char_len >= expr_len and (
 			   (read_len >= 2 and shared_read >= read_len - 1) or
 			   (expr_len >= 2 and shared_expr >= expr_len - 1)) then
@@ -231,10 +233,21 @@ function Selector:expand_selection_to_match(expression, reading)
 		end
 	end
 
-	local old_tail = self.tail_mora_index
-	self.tail_mora_index = tail_mora
-	if match_len > 0 and (match_len ~= self.selection_len or self.tail_mora_index ~= old_tail) then
+	if match_len > 0 then
+		-- Update current visual selection
+		self.index = base_index
+		self.mora_index = base_mora
 		self.selection_len = match_len
+		self.tail_mora_index = tail_mora
+
+		-- Synchronize with locked state if active so export reflects manual UI navigation
+		if self.lookup_locked then
+			self.locked_index = base_index
+			self.locked_mora_index = base_mora
+			self.locked_selection_len = match_len
+			self.locked_tail_mora = tail_mora
+		end
+
 		self:render()
 	end
 end

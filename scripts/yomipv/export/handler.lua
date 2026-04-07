@@ -145,13 +145,20 @@ local function merge_raw_content(existing, new_content, direction)
 end
 
 function Handler:start_export(gui)
+	if self.is_exporting then
+		msg.info("start_export: ignoring re-entrant call while export is in progress")
+		return
+	end
+
 	msg.info("Handler:start_export called")
+	self.is_exporting = true
 	local was_paused = mp.get_property_native("pause")
 	mp.set_property_native("pause", true)
 
 	local status, err = pcall(function()
 		local context = self:initialize_export_context(gui)
 		if not context then
+			self.is_exporting = false
 			if not was_paused then
 				mp.set_property_native("pause", false)
 			end
@@ -162,6 +169,7 @@ function Handler:start_export(gui)
 	end)
 
 	if not status then
+		self.is_exporting = false
 		msg.error("Error in start_export: " .. tostring(err))
 		Player.notify("Export failed: " .. tostring(err), "error", 4)
 		if not was_paused then
@@ -331,6 +339,9 @@ function Handler:handle_selector_result(context, selected_token)
 	msg.info("handle_selector_result: " .. (selected_token and "selected" or "cancelled"))
 
 	local keep_open = selected_token and selected_token.keep_open
+	if not keep_open then
+		self.is_exporting = false
+	end
 
 	if not keep_open then
 		self.expand_to_subtitle = nil
@@ -1119,6 +1130,7 @@ function Handler:new()
 		manual_end = nil,
 		timing_overlay = mp.create_osd_overlay("ass-events"),
 		current_tokens = nil,
+		is_exporting = false,
 	}
 	setmetatable(obj, self)
 	self.__index = self
