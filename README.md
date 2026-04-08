@@ -21,8 +21,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.4.0/win-yomipv-v0.4.0.zip), [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.4.0/linux-yomipv-v0.4.0.zip), or [macOS Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.4.0/mac-yomipv-v0.4.0.zip)
 2. Extract the contents directly into your MPV directory:
     - Windows: `%APPDATA%/mpv/`
-    - Linux: `~/.config/mpv/`
-    - macOS: `~/.config/mpv/`
+    - Linux/macOS: `~/.config/mpv/`
 
 ### Alternative (Requires Node.js)
 1. **Clone the repository** to your MPV directory and install dependencies **(make sure you have Node.js installed)**:
@@ -31,12 +30,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
      git clone https://github.com/BrenoAqua/Yomipv && xcopy /e /i /y Yomipv . && rd /s /q Yomipv && cd scripts\yomipv\lookup-app && npm install
      ```
    
-   - Linux: `~/.config/mpv/`
-     ```
-     git clone https://github.com/BrenoAqua/Yomipv && cp -rn Yomipv/* . && rm -rf Yomipv && cd scripts/yomipv/lookup-app && npm install
-     ```
-
-   - macOS: `~/.config/mpv/`
+   - Linux/macOS: `~/.config/mpv/`
      ```
      git clone https://github.com/BrenoAqua/Yomipv && cp -rn Yomipv/* . && rm -rf Yomipv && cd scripts/yomipv/lookup-app && npm install
      ```

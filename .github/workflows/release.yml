@@ -211,7 +211,7 @@ jobs:
           1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/win-yomipv-${{ github.ref_name }}.zip), [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/linux-yomipv-${{ github.ref_name }}.zip), or [macOS Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/mac-yomipv-${{ github.ref_name }}.zip).
           2. Extract the contents directly into your MPV directory:
               - Windows: \`%APPDATA%/mpv/\`
-              - Linux: \`~/.config/mpv/\`
+              - Linux/macOS: \`~/.config/mpv/\`
           EOF
           
       - name: Publish Release
