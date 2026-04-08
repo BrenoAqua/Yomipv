@@ -252,13 +252,23 @@ local default_options = {
 	key_sub_seek_next = "Alt+RIGHT",
 	key_sub_seek_prev = "Alt+LEFT",
 
+	--[[ AniList settings ]]
+
+	anilist_enabled = false,
+	anilist_token = "",
+	anilist_update_thresh_percent = 80,
+	anilist_show_notifications = true,
+	key_anilist_auth = "Ctrl+a",
+
 	--[[ Updater settings ]]
+
 	updater_enabled = true,
 	updater_check_on_startup = true,
 	updater_use_source = false,
 	key_update = "U",
 
 	--[[ MPV Settings ]]
+	
 	osd_messages = true, -- Show OSD messages
 }
 
