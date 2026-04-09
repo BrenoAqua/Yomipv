@@ -254,6 +254,8 @@ local default_options = {
 	key_sub_seek_prev = "Alt+LEFT",
 	key_secondary_sub_next = "Ctrl+j",
 	key_secondary_sub_prev = "Ctrl+J",
+	key_secondary_sub_next = "Ctrl+j",
+	key_secondary_sub_prev = "Ctrl+J",
 
 	--[[ AniList settings ]]
 
@@ -271,6 +273,7 @@ local default_options = {
 	key_update = "U",
 
 	--[[ MPV Settings ]]
+
 
 	osd_messages = true, -- Show OSD messages
 }
