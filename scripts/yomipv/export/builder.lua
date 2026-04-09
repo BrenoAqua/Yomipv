@@ -44,7 +44,7 @@ function Builder:get_metadata()
 	local path = mp.get_property("path", "")
 
 	local sanitized_title = self._sanitize_title(title, path)
-	local season_num, episode_num = self._parse_season_episode(title, path)
+	local season_num, episode_num = StringOps.parse_season_episode(title, path)
 	local timestamp = self:format_timestamp()
 
 	return {
@@ -136,49 +136,6 @@ end
 
 function Builder._sanitize_title(title, path)
 	return StringOps.clean_title(title, path)
-end
-
-function Builder._parse_season_episode(title, path)
-	local source = title or path or ""
-	source = source:gsub("%.%w+$", "")
-	-- Strip common tags/info that interfere with episode detection
-	source = source:gsub("%[[^%]]-%]", "")
-	source = source:gsub("%([^%)]-%)", "")
-	source = source:gsub("（[^）]-）", "")
-	source = source:gsub("【[^】]-】", "")
-	source = source:gsub("[vV][0-9]+", "") -- v2, v3
-	source = source:gsub("[%s%.%-_][12][0-9][0-9][0-9][%s%.%-_]", " ") -- years
-	source = source:gsub("[%s%.%-_][12][0-9][0-9][0-9]$", "") -- years at end
-	source = source:gsub("[%s%.%-]1080[pP]", "")
-	source = source:gsub("[%s%.%-]720[pP]", "")
-	source = source:gsub("[%s%.%-]480[pP]", "")
-	source = source:gsub("[%s%.%-_][xX]26[45]", "")
-	source = source:gsub("[%s%.%-_][hH]%.?26[45]", "")
-	source = source:gsub("[%s%.%-_][hH][eE][vV][cC]", "")
-	source = source:gsub("[%s%.%-_][aA][cC]3", "")
-	source = source:gsub("[%s%.%-_][aA][aA][cC]", "")
-	source = source:gsub("[%s%.%-_][mM][pP]3", "")
-	source = source:gsub("[%s%.%-_][fF][lL][aA][cC][0-9%.]*", "")
-	source = source:gsub("[%s%.%-_][dD][dD][pP][0-9%.]*", "")
-	source = source:gsub("[%s%.%-_][hH][iI]10[pP]?", "")
-	source = source:gsub("[%s%.%-_][nN][fF]", "")
-	source = source:gsub("[%s%.%-_][wW][eE][bB]%-?[dD][lL]", "")
-	source = source:gsub("[%s%.%-_][bB][uL][uL]%-?[rR][aA][yY]", "")
-	source = source:gsub("[%s%.%-_][mM][uU][lL][tT][iI][^%s%.%-_]*", "")
-
-	local season, episode
-
-	season, episode = source:match("[Ss](%d+)[Ee](%d+)")
-
-	if not season and not episode then
-		episode = source:match("[ _%.%-][Ee][Pp]?%s*(%d+)") or source:match("^[Ee][Pp]?%s*(%d+)")
-	end
-
-	if not season and not episode then
-		episode = source:match("([0-9]+)[^0-9]*$")
-	end
-
-	return season, episode
 end
 
 function Builder:format_timestamp()

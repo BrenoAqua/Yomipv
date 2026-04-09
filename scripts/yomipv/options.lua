@@ -243,6 +243,11 @@ local default_options = {
 	-- Behavior
 	subtitle_filter_enabled = true, -- Filter signs, drawings and tags from OSD display
 
+	-- Primary subtitles
+	primary_autoload = true, -- Auto-load external subtitle files matching anime episode
+	primary_sub_lang = "ja,jpn", -- Preferred languages for primary subtitles
+	primary_sub_exclude = "signs,songs,forced,commentary,sdh,cc", -- Skip tracks with any of these keywords
+
 	-- Secondary subtitles
 	secondary_sid = true, -- Track secondary subtitle stream for translations
 	secondary_on_hover = true, -- Show secondary subtitles only during hover interactions
@@ -252,8 +257,6 @@ local default_options = {
 	-- Keybindings
 	key_sub_seek_next = "Alt+RIGHT",
 	key_sub_seek_prev = "Alt+LEFT",
-	key_secondary_sub_next = "Ctrl+j",
-	key_secondary_sub_prev = "Ctrl+J",
 	key_secondary_sub_next = "Ctrl+j",
 	key_secondary_sub_prev = "Ctrl+J",
 

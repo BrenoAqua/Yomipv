@@ -178,6 +178,50 @@ function StringOps.clean_title(title, path)
 	return StringOps.trim(StringOps.normalize_spacing(s))
 end
 
+-- Extract season and episode from title or path
+function StringOps.parse_season_episode(title, path)
+	local source = title or path or ""
+	source = source:gsub("%.%w+$", "")
+	-- Strip common tags/info that interfere with episode detection
+	source = source:gsub("%[[^%]]-%]", "")
+	source = source:gsub("%([^%)]-%)", "")
+	source = source:gsub("（[^）]-）", "")
+	source = source:gsub("【[^】]-】", "")
+	source = source:gsub("[vV][0-9]+", "") -- v2, v3
+	source = source:gsub("[%s%.%-_][12][0-9][0-9][0-9][%s%.%-_]", " ") -- years
+	source = source:gsub("[%s%.%-_][12][0-9][0-9][0-9]$", "") -- years at end
+	source = source:gsub("[%s%.%-]1080[pP]", "")
+	source = source:gsub("[%s%.%-]720[pP]", "")
+	source = source:gsub("[%s%.%-]480[pP]", "")
+	source = source:gsub("[%s%.%-_][xX]26[45]", "")
+	source = source:gsub("[%s%.%-_][hH]%.?26[45]", "")
+	source = source:gsub("[%s%.%-_][hH][eE][vV][cC]", "")
+	source = source:gsub("[%s%.%-_][aA][cC]3", "")
+	source = source:gsub("[%s%.%-_][aA][aA][cC]", "")
+	source = source:gsub("[%s%.%-_][mM][pP]3", "")
+	source = source:gsub("[%s%.%-_][fF][lL][aA][cC][0-9%.]*", "")
+	source = source:gsub("[%s%.%-_][dD][dD][pP][0-9%.]*", "")
+	source = source:gsub("[%s%.%-_][hH][iI]10[pP]?", "")
+	source = source:gsub("[%s%.%-_][nN][fF]", "")
+	source = source:gsub("[%s%.%-_][wW][eE][bB]%-?[dD][lL]", "")
+	source = source:gsub("[%s%.%-_][bB][lLuU]%-?[rR][aA][yY]", "")
+	source = source:gsub("[%s%.%-_][mM][uU][lL][tT][iI][^%s%.%-_]*", "")
+
+	local season, episode
+
+	season, episode = source:match("[Ss](%d+)[Ee](%d+)")
+
+	if not season and not episode then
+		episode = source:match("[ _%.%-][Ee][Pp]?%s*(%d+)") or source:match("^[Ee][Pp]?%s*(%d+)")
+	end
+
+	if not season and not episode then
+		episode = source:match("([0-9]+)[^0-9]*$")
+	end
+
+	return season, episode
+end
+
 -- Trim leading and trailing whitespace
 function StringOps.trim(text)
 	if not text then
@@ -192,6 +236,28 @@ function StringOps.normalize_spacing(text)
 		return ""
 	end
 	return text:gsub("[ \t\n\r]+", " ")
+end
+
+-- Parse a comma-separated string into a table of lowercase, trimmed strings
+function StringOps.parse_comma_list(str)
+	local result = {}
+	if not str or str == "" then return result end
+	for s in string.gmatch(str, "([^,]+)") do
+		table.insert(result, (s:lower():gsub("^%s+", ""):gsub("%s+$", "")))
+	end
+	return result
+end
+
+-- Check if text contains any of the provided lowercase keywords
+function StringOps.contains_any(text, keywords)
+	if not text or not keywords then return false end
+	local lower = text:lower()
+	for _, kw in ipairs(keywords) do
+		if lower:find(kw, 1, true) then
+			return true
+		end
+	end
+	return false
 end
 
 -- Detect Japanese/CJK characters (Hiragana, Katakana, Kanji)

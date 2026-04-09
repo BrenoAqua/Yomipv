@@ -3,6 +3,7 @@
 
 local mp = require("mp")
 local msg = require("mp.msg")
+local StringOps = require("lib.string_ops")
 
 local SecondarySid = {}
 
@@ -127,25 +128,8 @@ function SecondarySid.select_secondary_track(is_dynamic)
 		return
 	end
 
-	local requested_langs = {}
-	for s in string.gmatch(sub_lang_opt, "([^,]+)") do
-		table.insert(requested_langs, (s:lower():gsub("^%s+", ""):gsub("%s+$", "")))
-	end
-
-	local exclude_opt = SecondarySid._config.secondary_sub_exclude or ""
-	local excluded_keywords = {}
-	for s in string.gmatch(exclude_opt, "([^,]+)") do
-		table.insert(excluded_keywords, (s:lower():gsub("^%s+", ""):gsub("%s+$", "")))
-	end
-
-	local function is_excluded(title)
-		for _, kw in ipairs(excluded_keywords) do
-			if title:find(kw, 1, true) then
-				return true
-			end
-		end
-		return false
-	end
+	local requested_langs = StringOps.parse_comma_list(sub_lang_opt)
+	local excluded_keywords = StringOps.parse_comma_list(SecondarySid._config.secondary_sub_exclude)
 
 	for _, pattern in ipairs(requested_langs) do
 		for _, track in ipairs(tracks) do
@@ -153,7 +137,7 @@ function SecondarySid.select_secondary_track(is_dynamic)
 				local lang = (track.lang or ""):lower()
 				local title = (track.title or ""):lower()
 
-				if not is_excluded(title) and (lang == pattern or title:find(pattern, 1, true)) then
+				if not StringOps.contains_any(title, excluded_keywords) and (lang == pattern or title:find(pattern, 1, true)) then
 					msg.info("Auto-selecting secondary subtitle: " .. track.id .. " (" .. (track.lang or "unknown") .. ")")
 
 					last_sid = tostring(track.id)

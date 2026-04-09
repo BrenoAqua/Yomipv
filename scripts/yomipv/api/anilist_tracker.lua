@@ -3,7 +3,7 @@
 local mp = require("mp")
 local msg = require("mp.msg")
 local utils = require("mp.utils")
-local Builder = require("export.builder")
+local StringOps = require("lib.string_ops")
 local Player = require("lib.player")
 local Platform = require("lib.platform")
 
@@ -77,8 +77,8 @@ function AnilistTracker:trigger_update()
 	local title = mp.get_property("media-title", "")
 	local path = mp.get_property("path", "")
 
-	local name = Builder._sanitize_title(title, path)
-	local season_num, episode_num = Builder._parse_season_episode(title, path)
+	local name = StringOps.clean_title(title, path)
+	local season_num, episode_num = StringOps.parse_season_episode(title, path)
 
 	if not name or name == "" then
 		msg.warn("AniList Tracker: Could not extract anime title from file.")
