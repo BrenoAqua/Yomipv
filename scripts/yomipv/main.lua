@@ -422,6 +422,18 @@ if config.key_sub_seek_prev ~= "" then
 	end)
 end
 
+if config.key_secondary_sub_next ~= "" then
+	mp.add_key_binding(config.key_secondary_sub_next, "yomipv-secondary-sub-next", function()
+		SecondarySid.cycle_track(1)
+	end)
+end
+
+if config.key_secondary_sub_prev ~= "" then
+	mp.add_key_binding(config.key_secondary_sub_prev, "yomipv-secondary-sub-prev", function()
+		SecondarySid.cycle_track(-1)
+	end)
+end
+
 mp.register_script_message("yomipv-sync-selection", function(text)
 	msg.info("Received selection sync: " .. tostring(text))
 	handler:sync_selection(text)
