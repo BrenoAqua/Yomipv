@@ -49,15 +49,16 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 1. Open a video with Japanese subtitles in MPV
 2. Press **`c`** or **move your mouse after an idle period** (if `selector_trigger_on_mouse_move` is enabled) to activate the word selector
 3. Navigate with **mouse hover** or **arrow keys** to select a word
+   - **`Shift+LEFT`** / **`Shift+RIGHT`**: Expand the current selection to include the previous/next subtitle line
 4. Press **`Enter`**, **`c`**, or **left-click** to create an Anki card
 
 ### Advanced Features
 
-- **Append Mode (`Shift+C`)**: Select multiple subtitle lines before exporting
-  - Press `Shift+C` to enter append mode, `c` to start the word selector, or `Shift+C` again to cancel
+- **Append Mode**: Select multiple subtitle lines before exporting
+  - Press **`Shift+C`** to enter append mode, **`c`** to start the word selector, or **`Shift+C`** again to cancel
 
-- **Subtitle Substitution & Colorization (`S`)**: 
-  - Press **`S`** to toggle between native MPV subtitles and Yomipv's colorized tokens
+- **Subtitle Substitution & Colorization based on anki card states**:
+  - Press **`Shift+S`** to toggle between native MPV subtitles and Yomipv's colorized tokens
   - Enable `substitute_mpv_subtitles` in `yomipv.conf` to start with it enabled
   - Words are colorized based on their Anki card metadata:
     - **Status**: New, Learning, Review, Suspended
@@ -66,20 +67,19 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - **Instant Feedback**: When you create a card, the word is immediately added to the local database and highlighted (red) in the current subtitle
   - See [docs/colorizer.md](docs/colorizer.md) for full details
 
-- **Secondary Subtitle**:
-  - Automatically select primary subtitles based on preferred languages
+- **Primary Subtitle Selection**:
+  - Automatically select and load primary subtitles based on preferred languages
+  - Scans the video directory for matching external subtitle files (`.ass`, `.srt`)
   - Configure `primary_sub_lang` in `yomipv.conf` (defaults to `ja,jpn`)
 
 - **Secondary Subtitle**:
-  - Automatically select secondary subtitles based on preferred languages
+  - Automatically select and cycle through secondary subtitles based on preferred languages
+  - **`Ctrl+j`** / **`Ctrl+Shift+J`**: Cycle through available secondary subtitle tracks
   - Configure `secondary_sub_lang` in `yomipv.conf` (defaults to `en,eng`)
   - Secondary subtitles are shown only on hover. Set `secondary_on_hover=no` to keep them always visible
 
-- **Mora-level Navigation**:
-  - When `selector_mora_hover` is enabled, hovering over a word narrows the lookup to start from mora under your cursor instead of the full word
-  - **`s`**: Toggle mora-level keyboard navigation (left/right moves by mora instead of word)
-
-- **Lookup App (`Ctrl+c`)**: Opens a popup window powered by your Yomitan dictionaries, showing definitions, pitch accents, and frequencies
+- **Lookup App**: Opens a popup window powered by your Yomitan dictionaries, showing definitions, pitch accents, and frequencies
+  - Press **`Ctrl+c`**: after selecting a word to open the lookup app manually. It opens automatically on hover by default
   - **Right-click** on the word in the selector to lock the lookup
   - **Click any mora** in the header to narrow the lookup to a sub-word
   - **Right-click the header** to go back to the previous word
@@ -87,30 +87,42 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - **Frequencies**: Toggle `lookup_show_frequencies` in `yomipv.conf`
   - See [docs/lookup-app.md](docs/lookup-app.md) for full details
 
-- **Persistent Mode (`v`)**: 
+- **Mora-level Navigation**:
+  - When `selector_mora_hover` is enabled, hovering over a word narrows the lookup to start from mora under your cursor instead of the full word
+  - **`s`**: Toggle mora-level keyboard navigation (left/right moves by mora instead of word)
+
+- **Persistent Mode**:
   - Toggle persistent mode to export multiple words from a single subtitle selection without closing the selector
   - Press **`v`** to toggle; the selection color changes to indicate it's active
   - Confirming a selection exports the card but keeps the selector open for the next pick
 
-- **Auto-Trigger Selector (`z`)**:
-  - Automatically open the selector by moving the mouse after it has been idle.
+- **Auto-Trigger Selector**:
+  - Automatically open the selector by moving the mouse after it has been idle
+  - **`z`**: Toggle this behavior on/off
   - Enable `selector_trigger_on_mouse_move` and customize `selector_trigger_mouse_idle_time` in `yomipv.conf`
 
-- **Manual Timing**:
+- **Manual Timing & Media**:
   - **`q`** / **`w`**: Set a custom start/end time for audio and picture extraction
   - Unset start or end times default to the subtitle boundaries when opening the selector
   - **`e`**: Clear manual timings
+  - **`g`**: Toggle between static and animated picture capture for Anki cards
 
-- **History Panel (`a`)**: Toggle subtitle history panel
-  - Click on previous/next lines to expand the subtitle lines (when selector is open)
+- **History Panel**:
+  - Press **`a`**: to toggle the history panel
   - Seek to a specific subtitle's timestamp by clicking on it (when selector is closed)
+  - Click on previous/next lines to expand the subtitle lines (when selector is open)
   - **`Alt+LEFT`** / **`Alt+RIGHT`**: Seek to the previous/next subtitle
 
-- **AniList Tracking (`Ctrl+A`)**: Integrates AniList with Yomipv, enabling automatic episode progress updates
-  - See [docs/anilist_tracking.md](docs/anilist_tracking.md) for setup and full details
+- **Subtitle Filtering**:
+  - Automatically filters non-dialogue text (signs, drawings, and formatting tags) from the OSD display
+  - Can be toggled with `subtitle_filter_enabled` in `yomipv.conf`
 
-- **Auto-Updater (`U`)**: Keeps Yomipv updated to the latest version
-  - Press **`U`** in MPV to trigger the update, or:
+- **AniList Tracking**: Integrates AniList with Yomipv, enabling automatic episode progress updates
+  - **`Ctrl+a`**: Trigger the authentication and setup flow (opens a terminal to capture your token)
+  - See [docs/anilist_tracking.md](docs/anilist_tracking.md) for full details
+
+- **Auto-Updater**: Keeps Yomipv updated to the latest version
+  - Press **`shift+U`** in MPV to trigger the update, or:
     - On Windows: Run **`yomipv-updater.bat`** directly
     - On Linux / macOS: Run **`yomipv-updater.sh`** directly
   - Choose between latest official releases or latest source (main branch)
