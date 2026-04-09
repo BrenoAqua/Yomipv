@@ -67,8 +67,13 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - See [docs/colorizer.md](docs/colorizer.md) for full details
 
 - **Secondary Subtitle**:
+  - Automatically select primary subtitles based on preferred languages
+  - Configure `primary_sub_lang` in `yomipv.conf` (defaults to `ja,jpn`)
+
+- **Secondary Subtitle**:
   - Automatically select secondary subtitles based on preferred languages
-  - Configure `secondary_sub_lang` in `yomipv.conf`
+  - Configure `secondary_sub_lang` in `yomipv.conf` (defaults to `en,eng`)
+  - Secondary subtitles are shown only on hover. Set `secondary_on_hover=no` to keep them always visible
 
 - **Mora-level Navigation**:
   - When `selector_mora_hover` is enabled, hovering over a word narrows the lookup to start from mora under your cursor instead of the full word
