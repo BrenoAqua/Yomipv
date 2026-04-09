@@ -100,7 +100,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - Seek to a specific subtitle's timestamp by clicking on it (when selector is closed)
   - **`Alt+LEFT`** / **`Alt+RIGHT`**: Seek to the previous/next subtitle
 
-- **AniList Tracking (`Ctrl+A`)**: Integrates AniList with Yomipv, enabling automatic episode progress updates.
+- **AniList Tracking (`Ctrl+A`)**: Integrates AniList with Yomipv, enabling automatic episode progress updates
   - See [docs/anilist_tracking.md](docs/anilist_tracking.md) for setup and full details
 
 - **Auto-Updater (`U`)**: Keeps Yomipv updated to the latest version
