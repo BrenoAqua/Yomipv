@@ -1,6 +1,5 @@
 --[[ AniList integration module ]]
 
-local mp = require("mp")
 local utils = require("mp.utils")
 local msg = require("mp.msg")
 
@@ -50,7 +49,7 @@ function Anilist:search_anime_by_title(query, callback)
 			}
 		}
 	]], MEDIA_FIELDS)
-	
+
 	local variables = { search = query }
 	local body = utils.format_json({ query = graphql_query, variables = variables })
 	local headers = { ["Content-Type"] = "application/json", ["Accept"] = "application/json" }
@@ -85,7 +84,7 @@ function Anilist:get_media_by_id(media_id, callback)
 	local body = utils.format_json({ query = graphql_query, variables = variables })
 	local headers = { ["Content-Type"] = "application/json", ["Accept"] = "application/json" }
 
-	self.curl.request(self.base_url, body, function(success, result, err)
+	self.curl.request(self.base_url, body, function(success, result, _err)
 		if not success or not result or result.status ~= 0 then
 			callback(false, "Request failed")
 			return
@@ -161,8 +160,11 @@ function Anilist:check_and_update(title, season_num, episode_num, callback)
 			return
 		end
 
-		msg.info(string.format("Episode %d is higher than %s max episodes (%d). Searching for sequel...", target_ep, media.title.romaji, media.episodes))
-		
+		msg.info(string.format(
+			"Episode %d is higher than %s max episodes (%d). Searching for sequel...",
+			target_ep, media.title.romaji, media.episodes
+		))
+
 		local sequel_id = nil
 		if media.relations and media.relations.edges then
 			for _, edge in ipairs(media.relations.edges) do

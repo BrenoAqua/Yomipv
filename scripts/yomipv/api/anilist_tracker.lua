@@ -27,7 +27,7 @@ function AnilistTracker.init(config, anilist)
 		AnilistTracker.has_updated = false
 	end)
 
-	mp.observe_property("percent-pos", "number", function(name, percent_pos)
+	mp.observe_property("percent-pos", "number", function(_, percent_pos)
 		if not percent_pos or AnilistTracker.has_updated then
 			return
 		end
@@ -44,14 +44,19 @@ function AnilistTracker.spawn_auth_terminal()
 
 	if Platform.IS_WINDOWS then
 		local script_path = Platform.normalize_path(utils.join_path(root_dir, "export/auth_anilist.ps1"))
-		local args = { "cmd", "/c", "start", "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path, conf_path }
-		
+		local args = { "cmd", "/c", "start", "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+			script_path, conf_path }
+
 		msg.info("Starting AniList auth terminal via PowerShell")
-		mp.command_native_async({ name = "subprocess", playback_only = false, detach = true, args = args }, function() end)
+		mp.command_native_async(
+			{ name = "subprocess", playback_only = false, detach = true, args = args },
+			function() end
+		)
 	else
 		local script_path = Platform.normalize_path(utils.join_path(root_dir, "export/auth_anilist.sh"))
-		mp.command_native_async({ name = "subprocess", playback_only = false, args = { "chmod", "+x", script_path } }, function()
-			local args = {}
+		local chmod_args = { name = "subprocess", playback_only = false, args = { "chmod", "+x", script_path } }
+		mp.command_native_async(chmod_args, function()
+			local args
 			if Platform.IS_MACOS then
 				args = { "open", "-a", "Terminal.app", script_path, "--args", conf_path }
 			else
