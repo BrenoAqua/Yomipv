@@ -64,6 +64,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
     - **Intervals**: Reflects how well a word is known (affects color shades)
     - **Requirement**: Press **`B`** to build/sync the local Anki database first before these statuses can be displayed for your existing collection
   - **Instant Feedback**: When you create a card, the word is immediately added to the local database and highlighted (red) in the current subtitle
+  - See [docs/colorizer.md](docs/colorizer.md) for full details
 
 - **Secondary Subtitle**:
   - Automatically select secondary subtitles based on preferred languages
