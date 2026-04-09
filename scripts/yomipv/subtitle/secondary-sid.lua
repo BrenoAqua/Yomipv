@@ -17,6 +17,14 @@ function SecondarySid.init(config)
 		SecondarySid.select_secondary_track()
 	end)
 
+	mp.observe_property("sid", "number", function()
+		SecondarySid.select_secondary_track(true)
+	end)
+
+	mp.observe_property("track-list", "native", function()
+		SecondarySid.select_secondary_track(true)
+	end)
+
 	if config.secondary_on_hover then
 		SecondarySid.setup_hover_tracking()
 	end
@@ -72,8 +80,21 @@ function SecondarySid.setup_hover_tracking()
 	update_hover_state() -- Initial check
 end
 
+-- Internal state for selection debouncing
+local selection_timer = nil
+
 -- Select secondary subtitle track
-function SecondarySid.select_secondary_track()
+function SecondarySid.select_secondary_track(is_dynamic)
+	if is_dynamic then
+		if selection_timer then
+			selection_timer:kill()
+		end
+		selection_timer = mp.add_timeout(0.2, function()
+			SecondarySid.select_secondary_track(false)
+		end)
+		return
+	end
+
 	local tracks = mp.get_property_native("track-list")
 	if not tracks then
 		return
@@ -81,18 +102,22 @@ function SecondarySid.select_secondary_track()
 
 	local current_sid = mp.get_property_number("sid") or 0
 	local secondary_sid = mp.get_property("secondary-sid")
+	local secondary_sid_num = tonumber(secondary_sid)
 
 	-- Respect manual selection
 	if secondary_sid and secondary_sid ~= "no" then
-		msg.info("Secondary subtitle already set to: " .. secondary_sid)
-		last_sid = secondary_sid
-		if SecondarySid._config.secondary_on_hover then
-			mp.set_property_native("secondary-sub-visibility", is_hovering)
-			if is_hovering then
-				mp.set_property_number("secondary-sub-pos", 10)
+		if secondary_sid_num ~= current_sid then
+			msg.info("Secondary subtitle already set to: " .. secondary_sid)
+			last_sid = secondary_sid
+			if SecondarySid._config.secondary_on_hover then
+				mp.set_property_native("secondary-sub-visibility", is_hovering)
+				if is_hovering then
+					mp.set_property_number("secondary-sub-pos", 10)
+				end
 			end
+			return
 		end
-		return
+		msg.info("Secondary subtitle conflicts with primary, re-selecting...")
 	end
 
 	local sub_lang_opt = SecondarySid._config.secondary_sub_lang

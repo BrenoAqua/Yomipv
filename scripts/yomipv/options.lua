@@ -247,7 +247,7 @@ local default_options = {
 	secondary_sid = true, -- Track secondary subtitle stream for translations
 	secondary_on_hover = true, -- Show secondary subtitles only during hover interactions
 	secondary_sub_lang = "en,eng", -- Preferred languages for secondary subtitles
-	secondary_sub_exclude = "signs,songs,forced,commentary,sdh,cc", -- Skip tracks whose title contains any of these keywords
+	secondary_sub_exclude = "signs,songs,forced,commentary,sdh,cc", -- Skip tracks with any of these keywords
 
 	-- Keybindings
 	key_sub_seek_next = "Alt+RIGHT",
