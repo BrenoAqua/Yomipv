@@ -5,6 +5,7 @@ const net = require('net');
 
 let mainWindow;
 let pendingHide = false;
+let lastSelectedDictHtml = '';
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -67,6 +68,13 @@ app.whenReady().then(() => {
   // Simple HTTP server to receive terms from MPV
   const server = http.createServer((req, res) => {
     console.log(`[IPC] Request: ${req.method} ${req.url}`);
+    
+    if (req.method === 'GET' && req.url === '/selected-dictionary-html') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(lastSelectedDictHtml);
+      return;
+    }
+
     if (req.method === 'POST') {
       let body = '';
       req.on('data', chunk => {
@@ -78,7 +86,7 @@ app.whenReady().then(() => {
           res.end('closing');
           
           if (mpvIpc) {
-            mpvIpc.end();
+            mpvIpc.destroy();
             mpvIpc = null;
           }
           
@@ -141,7 +149,7 @@ app.whenReady().then(() => {
       } catch (e) {
         console.log('[INFO] Parent process died, shutting down...');
         if (mpvIpc) {
-          mpvIpc.end();
+          mpvIpc.destroy();
           mpvIpc = null;
         }
         app.quit();
@@ -172,8 +180,11 @@ ipcMain.on('sync-selection', (event, text) => {
 
 ipcMain.on('dictionary-selected', (event, content) => {
   console.log('[IPC] dictionary-selected received');
+  
+  lastSelectedDictHtml = content;
+
   if (mpvIpc) {
-    const cmd = { command: ['script-message', 'yomipv-dictionary-selected', content] };
+    const cmd = { command: ['script-message', 'yomipv-dictionary-selected', 'HTTP_FETCH'] };
     mpvIpc.write(JSON.stringify(cmd) + '\n');
   } else {
     console.warn('[IPC] Cannot send dictionary selection: mpvIpc not connected');

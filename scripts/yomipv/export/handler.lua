@@ -355,8 +355,6 @@ function Handler:handle_selector_result(context, selected_token)
 		end
 	end
 
-
-
 	if not selected_token then
 		msg.info("Selector cancelled")
 		self:refresh_timing_overlay()
@@ -469,6 +467,22 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 
 	local function check_completion()
 		if tasks_pending == 0 and furigana_done then
+			if self.selected_dictionary == "HTTP_FETCH" then
+				tasks_pending = 1 -- Block until HTTP fetch completes
+				msg.info("Fetching dictionary HTML via HTTP...")
+				Curl.get("http://127.0.0.1:19634/selected-dictionary-html", function(success, output)
+					if success and output.status == 0 then
+						self.selected_dictionary = output.stdout
+						msg.info("Dictionary HTML fetched successfully, len: " .. tostring(#self.selected_dictionary))
+					else
+						msg.warn("Failed to fetch dictionary HTML via HTTP")
+						self.selected_dictionary = nil
+					end
+					tasks_pending = 0
+					check_completion()
+				end)
+				return
+			end
 			self:perform_anki_save(context, note_fields)
 		end
 	end
