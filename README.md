@@ -16,6 +16,8 @@
 
 https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 
+---
+
 ## Requirements
 
 - **[MPV](https://mpv.io/)** (0.33.0 or higher)
