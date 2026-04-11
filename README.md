@@ -131,7 +131,8 @@ Opens a popup window powered by your Yomitan dictionaries, showing definitions, 
 
 - **Subtitle Sync**
   - Align primary Japanese subtitles to secondary translation timings to fix desynced tracks
-  - **`Ctrl+s`**: Manually trigger a near-instant synchronization. Pressing it again undos the sync and restores the previous timing
+  - *Note: Since it only matches initial timings, tracks can desync later on*
+  - **`Ctrl+s`**: Manually trigger the synchronization. Pressing it again undoes the sync and restores the previous timing
   - Enable `auto_sync_subtitles` in `yomipv.conf` to automatically trigger sync when tracks change
 
 - **Subtitle Management**
