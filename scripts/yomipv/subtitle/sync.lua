@@ -14,6 +14,16 @@ local SYNC_THRESHOLD = 0.1
 local SAMPLE_COUNT   = 32
 local BIN            = 0.25
 
+local last_sync = {
+	original_delay = nil,
+	applied_delay  = nil,
+}
+
+function SubtitleSync.clear_last_sync()
+	last_sync.original_delay = nil
+	last_sync.applied_delay  = nil
+end
+
 -- Exclude known sign/lyric styles from timing extraction
 local SONG_STYLES = {
 	song = true, karaoke = true, op = true, ed = true,
@@ -207,6 +217,16 @@ function SubtitleSync.execute_instant_sync()
 	local s_sid = mp.get_property_number("secondary-sid")
 	if not p_sid or not s_sid then return end
 
+	local current_delay = mp.get_property_number("sub-delay") or 0
+	if last_sync.applied_delay and math.abs(current_delay - last_sync.applied_delay) < 0.001 then
+		if last_sync.original_delay then
+			mp.set_property_number("sub-delay", last_sync.original_delay)
+			Player.notify(string.format("Restored Subtitle Timing (%.3fs)", last_sync.original_delay), "info")
+		end
+		SubtitleSync.clear_last_sync()
+		return
+	end
+
 	local p_times, s_times = nil, nil
 	local checks_done = 0
 
@@ -220,7 +240,9 @@ function SubtitleSync.execute_instant_sync()
 			return
 		end
 
-		if math.abs(offset) >= SYNC_THRESHOLD then
+		if math.abs(offset - current_delay) >= SYNC_THRESHOLD then
+			last_sync.original_delay = current_delay
+			last_sync.applied_delay  = offset
 			mp.set_property_number("sub-delay", offset)
 			Player.notify(string.format("Synced Subtitle Timing (%.3fs)", offset), "info")
 		end
@@ -235,6 +257,7 @@ function SubtitleSync.init(config)
 		local sync_timer = nil
 		local function trigger()
 			if not mp.get_property_number("sid") or not mp.get_property_number("secondary-sid") then return end
+			SubtitleSync.clear_last_sync()
 			if sync_timer then sync_timer:kill() end
 			-- Brief delay to prevent race conditions during rapid track cycling
 			sync_timer = mp.add_timeout(0.1, function() SubtitleSync.execute_instant_sync() end)
