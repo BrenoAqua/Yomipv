@@ -237,6 +237,7 @@ local default_options = {
 
 	-- Keybindings
 	key_toggle_history = "a",
+	key_history_clear = "x",
 
 	--[[ Subtitle settings ]]
 
@@ -247,6 +248,7 @@ local default_options = {
 	primary_autoload = true, -- Auto-load external subtitle files matching anime episode
 	primary_sub_lang = "ja,jpn", -- Preferred languages for primary subtitles
 	primary_sub_exclude = "signs,songs,forced,commentary,sdh,cc", -- Skip tracks with any of these keywords
+	auto_sync_subtitles = true, -- Automatically sync primary subtitle timing to secondary if languages match
 
 	-- Secondary subtitles
 	secondary_sid = true, -- Track secondary subtitle stream for translations
@@ -259,6 +261,7 @@ local default_options = {
 	key_sub_seek_prev = "Alt+LEFT",
 	key_secondary_sub_next = "Ctrl+j",
 	key_secondary_sub_prev = "Ctrl+J",
+	key_sync_subtitles = "Ctrl+s",
 
 	--[[ AniList settings ]]
 

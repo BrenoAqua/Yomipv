@@ -1,15 +1,25 @@
-# Yomipv
+<p align="center">
+    <img src="https://github.com/BrenoAqua/Yomipv/blob/main/scripts/yomipv/lookup-app/build/lookup-app.png?raw=true" width="100" height="100" style="border-radius: 20px" alt="yomipv" />
+</p>
 
-Yomipv is a script that combines Yomitan with MPV to lookup words and create Anki cards from Japanese media without leaving the player and breaking immersion.
-There's no need to alt-tab between MPV and Yomitan while mining or doing word lookups.
-It was designed and pre-configured to be used with [Senren Note Type](https://github.com/BrenoAqua/Senren), but it should work with any note type.
+<h1 align="center">Yomipv</h1>
+<p align="center">
+  <img src="https://img.shields.io/github/v/release/BrenoAqua/Yomipv?color=blue" alt="Version">
+  <a href="https://github.com/sponsors/BrenoAqua"><img src="https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=flat&logo=github-sponsors" alt="Sponsor"></a>
+  <img src="https://img.shields.io/github/downloads/BrenoAqua/Yomipv/total?color=orange" alt="Downloads">
+  <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License">
+</p>
+
+<p align="center">An immersion-centric workflow for looking up and mining words without leaving MPV</p>
+
+---
 
 https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 
 ## Requirements
 
 - **[MPV](https://mpv.io/)** (0.33.0 or higher)
-- **[FFmpeg](https://ffmpeg.org/)** (Required for media extraction, falls back to MPV's internal encoder if not found)
+- **[FFmpeg](https://ffmpeg.org/)**
 - **[Anki](https://apps.ankiweb.net/)** with **[AnkiConnect](https://ankiweb.net/shared/info/2055492159)**
 - **[Yomitan](https://yomitan.wiki/)** and **[Yomitan Api](https://github.com/yomidevs/yomitan-api)**
 - **curl** (Pre-installed on most systems, used for API requests)
@@ -35,6 +45,8 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
      git clone https://github.com/BrenoAqua/Yomipv && cp -rn Yomipv/* . && rm -rf Yomipv && cd scripts/yomipv/lookup-app && npm install
      ```
 
+---
+
 ## Usage
 
 **Configure Settings**:
@@ -52,12 +64,60 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
    - **`Shift+LEFT`** / **`Shift+RIGHT`**: Expand the current selection to include the previous/next subtitle line
 4. Press **`Enter`**, **`c`**, or **left-click** to create an Anki card
 
-### Advanced Features
+
+
+## Advanced Features
+
+### **Selector**
 
 - **Append Mode**: Select multiple subtitle lines before exporting
   - Press **`Shift+C`** to enter append mode, **`c`** to start the word selector, or **`Shift+C`** again to cancel
 
-- **Subtitle Substitution & Colorization based on anki card states**:
+- **Mora-level Navigation**
+  - When `selector_mora_hover` is enabled, hovering over a word narrows the lookup to start from mora under your cursor instead of the full word
+  - **`s`**: Toggle mora-level keyboard navigation (left/right moves by mora instead of word)
+
+- **Auto-Trigger Selector**
+  - Automatically open the selector by moving the mouse after it has been idle
+  - **`z`**: Toggle this behavior on/off
+  - Enable `selector_trigger_on_mouse_move` and customize `selector_trigger_mouse_idle_time` in `yomipv.conf`
+
+- **Persistent Mode**
+  - Toggle persistent mode to export multiple words from a single subtitle selection without closing the selector
+  - Press **`v`** to toggle the selection color changes to indicate it's active
+  - Confirming a selection exports the card but keeps the selector open for the next pick
+
+### **Media and Extraction**
+
+  - **Manual Timings**
+    - **`q`** / **`w`**: Set a custom start/end time for audio and picture extraction
+    - Unset start or end times default to the subtitle boundaries when opening the selector
+    - **`e`**: Clear manual timings
+  - Press **`g`** to switch the extraction mode between screenshots and animated clips
+
+### **History Panel**
+  - Press **`a`** to toggle the history panel
+  - Seek to a specific subtitle's timestamp by clicking on it (when selector is closed)
+  - Click on previous/next lines to expand the subtitle lines (when selector is open)
+  - **`Alt+LEFT`** / **`Alt+RIGHT`**: Seek to the previous/next subtitle
+  - Press **`x`** to clear subtitle history (when the history panel is open)
+  - Includes buttons to toggle picture animation and clear subtitle history
+
+### **Lookup App**
+
+Opens a popup window powered by your Yomitan dictionaries, showing definitions, pitch accents, and frequencies
+
+  - Press **`Ctrl+c`**: after selecting a word to open the lookup app manually. It opens automatically on hover by default
+  - **Right-click** on the word in the selector to lock the lookup
+  - **Click any mora** in the header to narrow the lookup to a sub-word
+  - **Right-click the header** to go back to the previous word
+  - **Pitch Accents**: Toggle `lookup_show_pitch_accents` in `yomipv.conf`
+  - **Frequencies**: Toggle `lookup_show_frequencies` in `yomipv.conf`
+  - See [docs/lookup-app.md](docs/lookup-app.md) for full details
+
+### **Subtitle Tools**
+
+- **Subtitle Substitution & Colorization based on anki card states**
   - Press **`Shift+S`** to toggle between native MPV subtitles and Yomipv's colorized tokens
   - Enable `substitute_mpv_subtitles` in `yomipv.conf` to start with it enabled
   - Words are colorized based on their Anki card metadata:
@@ -67,61 +127,33 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - **Instant Feedback**: When you create a card, the word is immediately added to the local database and highlighted (red) in the current subtitle
   - See [docs/colorizer.md](docs/colorizer.md) for full details
 
-- **Primary Subtitle Selection**:
-  - Automatically select and load primary subtitles based on preferred languages
-  - Scans the video directory for matching external subtitle files (`.ass`, `.srt`)
-  - Configure `primary_sub_lang` in `yomipv.conf` (defaults to `ja,jpn`)
+- **Subtitle Sync**
+  - Align primary Japanese subtitles to secondary translation timings to fix desynced tracks
+  - **`Ctrl+s`**: Manually trigger a near-instant synchronization
+  - Enable `auto_sync_subtitles` in `yomipv.conf` to automatically trigger sync when tracks change
 
-- **Secondary Subtitle**:
+- **Subtitle Management**
   - Automatically select and cycle through secondary subtitles based on preferred languages
+  - Configure `primary_sub_lang` and `secondary_sub_lang` in `yomipv.conf` (defaults to `ja,jpn` and `en,eng` respectively)
+  - Scans the video directory for matching external subtitle files (`.ass`, `.srt`)
   - **`Ctrl+j`** / **`Ctrl+Shift+J`**: Cycle through available secondary subtitle tracks
-  - Configure `secondary_sub_lang` in `yomipv.conf` (defaults to `en,eng`)
   - Secondary subtitles are shown only on hover. Set `secondary_on_hover=no` to keep them always visible
 
-- **Lookup App**: Opens a popup window powered by your Yomitan dictionaries, showing definitions, pitch accents, and frequencies
-  - Press **`Ctrl+c`**: after selecting a word to open the lookup app manually. It opens automatically on hover by default
-  - **Right-click** on the word in the selector to lock the lookup
-  - **Click any mora** in the header to narrow the lookup to a sub-word
-  - **Right-click the header** to go back to the previous word
-  - **Pitch Accents**: Toggle `lookup_show_pitch_accents` in `yomipv.conf`
-  - **Frequencies**: Toggle `lookup_show_frequencies` in `yomipv.conf`
-  - See [docs/lookup-app.md](docs/lookup-app.md) for full details
-
-- **Mora-level Navigation**:
-  - When `selector_mora_hover` is enabled, hovering over a word narrows the lookup to start from mora under your cursor instead of the full word
-  - **`s`**: Toggle mora-level keyboard navigation (left/right moves by mora instead of word)
-
-- **Persistent Mode**:
-  - Toggle persistent mode to export multiple words from a single subtitle selection without closing the selector
-  - Press **`v`** to toggle; the selection color changes to indicate it's active
-  - Confirming a selection exports the card but keeps the selector open for the next pick
-
-- **Auto-Trigger Selector**:
-  - Automatically open the selector by moving the mouse after it has been idle
-  - **`z`**: Toggle this behavior on/off
-  - Enable `selector_trigger_on_mouse_move` and customize `selector_trigger_mouse_idle_time` in `yomipv.conf`
-
-- **Manual Timing & Media**:
-  - **`q`** / **`w`**: Set a custom start/end time for audio and picture extraction
-  - Unset start or end times default to the subtitle boundaries when opening the selector
-  - **`e`**: Clear manual timings
-  - **`g`**: Toggle between static and animated picture capture for Anki cards
-
-- **History Panel**:
-  - Press **`a`**: to toggle the history panel
-  - Seek to a specific subtitle's timestamp by clicking on it (when selector is closed)
-  - Click on previous/next lines to expand the subtitle lines (when selector is open)
-  - **`Alt+LEFT`** / **`Alt+RIGHT`**: Seek to the previous/next subtitle
-
-- **Subtitle Filtering**:
+- **Subtitle Filtering**
   - Automatically filters non-dialogue text (signs, drawings, and formatting tags) from the OSD display
   - Can be toggled with `subtitle_filter_enabled` in `yomipv.conf`
 
-- **AniList Tracking**: Integrates AniList with Yomipv, enabling automatic episode progress updates
+### **AniList Tracking**
+
+Integrates AniList with Yomipv, enabling automatic episode progress updates
+
   - **`Ctrl+a`**: Trigger the authentication and setup flow (opens a terminal to capture your token)
   - See [docs/anilist_tracking.md](docs/anilist_tracking.md) for full details
 
-- **Auto-Updater**: Keeps Yomipv updated to the latest version
+### **Auto-Updater**
+
+Keeps Yomipv updated to the latest version
+
   - Press **`shift+U`** in MPV to trigger the update, or:
     - On Windows: Run **`yomipv-updater.bat`** directly
     - On Linux / macOS: Run **`yomipv-updater.sh`** directly
@@ -130,6 +162,8 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - Downloads platform-specific binaries for the Lookup App
   - (Source mode only) Updates dependencies for the Lookup App (requires Node.js)
   - Requires administrator privileges to run the PowerShell script on Windows
+
+---
 
 ## Troubleshooting
 

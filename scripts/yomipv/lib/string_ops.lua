@@ -17,6 +17,11 @@ local BRACKET_PATTERNS = {
 local TITLE_CLEAN_PATTERNS = {
 	"[%.%s_]+[Ss]%d+[Ee]%d+", -- S01E01
 	"[%.%s_]+[Ee]%d+", -- E01
+	"[%.%s_]+[Ss]eason%s*%d+", -- Season 1
+	"[%.%s_]+%d+[a-z][a-z]%s+[Ss]eason", -- 2nd Season
+	"[%.%s_]+[Ss]%d+", -- S1
+	"[%.%s_]+[0-9]+[vV][0-9]+$", -- 01v2
+	"[%.%s_]+[0-9]+$", -- Trailing episode number
 	"[%.%d]+$", -- Trailing numbers/dots
 	"%.%w+$", -- Extensions
 }
@@ -142,7 +147,12 @@ function StringOps.clean_title(title, path)
 		"[nN][fF]", "[wW][eE][bB]%-?[dD][lL]", "[bB][lL][uU]%-?[rR][aA][yY]",
 		"[mM][uU][lL][tT][iI][^%s%.%-_]*", "[mM][sS][uU][bB][sS]?", "[dD][uU][aA][lL]",
 		"[yY][uU][rR][aA][sS][uU][kK][aA]", "[tT][oO][oO][nN][sS][hH][uU][bB]",
-		"[0-9]+%-[bB][iI][tT]"
+		"[0-9]+%-[bB][iI][tT]",
+		"[uU][nN][cC][eE][nN][sS][oO][rR][eE][dD]", "[cC][eE][nN][sS][oO][rR][eE][dD]",
+		"[bB][aA][tT][cC][hH]", "[rR][eE][pP][aA][cC][kK]", "[pP][rR][oO][pP][eE][rR]",
+		"[bB][dD][rR][iI][pP]?", "[bB][dD]", "[tT][vV]", "[wW][eE][bB]",
+		"[vV][pP]9", "[aA][vV]1", "[xX][vV][iI][dD]",
+		"[sS][pP][eE][cC][iI][aA][lL]", "[oO][vV][aA]", "[oO][nN][aA]", "[oO][aA][dD]"
 	}
 
 	for _, tag in ipairs(tags) do
@@ -151,11 +161,7 @@ function StringOps.clean_title(title, path)
 		s = s:gsub("^" .. tag .. "[%s%.%-_]", "")
 	end
 
-	-- Strip episode separators and numbers
-	s = s:gsub("[%s%.%-_]+[0-9]+[vV][0-9]+$", "") -- 01v2
-	s = s:gsub("[%s%.%-_]+[0-9]+$", "")
-
-	-- Strip season/episode tags
+	-- Strip season/episode/version tags based on patterns
 	for _, pattern in ipairs(TITLE_CLEAN_PATTERNS) do
 		if pattern ~= "%.%w+$" then
 			s = s:gsub(pattern, "")
@@ -182,6 +188,21 @@ end
 function StringOps.parse_season_episode(title, path)
 	local source = title or path or ""
 	source = source:gsub("%.%w+$", "")
+
+	local season, episode
+
+	-- Combined S01E01 format
+	season, episode = source:match("[Ss](%d+)[Ee](%d+)")
+
+	-- Independent season detection (before stripping brackets/parentheses)
+	if not season then
+		season = source:match("[ _%.%-][Ss]eason%s*(%d+)")
+			or source:match("[ _%.%-][Ss](%d+)[ _%.%-]")
+			or source:match("[ _%.%-][Ss](%d+)$")
+			or source:match("^(%d+)[a-z][a-z]%s+[Ss]eason")
+			or source:match("[%( ][ _%.%-]?(%d+)[a-z][a-z]%s+[Ss]eason")
+	end
+
 	-- Strip common tags/info that interfere with episode detection
 	source = source:gsub("%[[^%]]-%]", "")
 	source = source:gsub("%([^%)]-%)", "")
@@ -207,16 +228,12 @@ function StringOps.parse_season_episode(title, path)
 	source = source:gsub("[%s%.%-_][bB][lLuU]%-?[rR][aA][yY]", "")
 	source = source:gsub("[%s%.%-_][mM][uU][lL][tT][iI][^%s%.%-_]*", "")
 
-	local season, episode
-
-	season, episode = source:match("[Ss](%d+)[Ee](%d+)")
-
-	if not season and not episode then
-		episode = source:match("[ _%.%-][Ee][Pp]?%s*(%d+)") or source:match("^[Ee][Pp]?%s*(%d+)")
-	end
-
-	if not season and not episode then
-		episode = source:match("([0-9]+)[^0-9]*$")
+	-- Independent episode detection
+	if not episode then
+		episode = source:match("[ _%.%-][Ee][Pp]?%s*(%d+)")
+			or source:match("^[Ee][Pp]?%s*(%d+)")
+			-- Trailing number that isn't part of a season tag
+			or source:match("[ _%.%-](%d+)[^0-9]*$")
 	end
 
 	return season, episode
@@ -260,24 +277,41 @@ function StringOps.contains_any(text, keywords)
 	return false
 end
 
--- Detect Japanese/CJK characters (Hiragana, Katakana, Kanji)
 function StringOps.has_japanese(text)
 	if not text or text == "" then
 		return false
 	end
 
-	-- UTF-8 ranges for Japanese/CJK
-	-- Hiragana: [0x3040, 0x309F]
-	-- Katakana: [0x30A0, 0x30FF]
-	-- Kanji (CJK Unified Ideographs): [0x4E00, 0x9FAF]
-	-- Half-width Katakana: [0xFF66, 0xFF9F]
+	-- UTF-8 byte match check for Hiragana, Katakana, and Kanji ranges
+	return text:find("[\227][\128-\131]") ~= nil
+		or text:find("[\228-\233]") ~= nil
+		or text:find("[\239][\189-\190]") ~= nil
+end
 
-	-- Check for common Japanese UTF-8 byte sequences
-	-- E3 81-83: Hiragana/Katakana
-	-- E4-E9: Kanji
-	local found = text:find("[\227][\128-\131]") or text:find("[\228-\233]") or text:find("[\239][\189-\190]")
+function StringOps.is_hiragana_only(text)
+	if not text or text == "" then return false end
+	local char_count, hiragana_count = 0, 0
+	for _, code in StringOps.utf8_codes(text) do
+		-- Hiragana range: U+3041 to U+309F
+		if code >= 0x3041 and code <= 0x309F then
+			hiragana_count = hiragana_count + 1
+		end
+		char_count = char_count + 1
+	end
+	return char_count > 0 and char_count == hiragana_count
+end
 
-	return found ~= nil
+function StringOps.is_katakana_only(text)
+	if not text or text == "" then return false end
+	local char_count, katakana_count = 0, 0
+	for _, code in StringOps.utf8_codes(text) do
+		-- Katakana range: U+30A0 to U+30FF
+		if code >= 0x30A0 and code <= 0x30FF then
+			katakana_count = katakana_count + 1
+		end
+		char_count = char_count + 1
+	end
+	return char_count > 0 and char_count == katakana_count
 end
 
 -- Iterator that yields (next_index, codepoint)

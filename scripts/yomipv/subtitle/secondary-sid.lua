@@ -4,6 +4,7 @@
 local mp = require("mp")
 local msg = require("mp.msg")
 local StringOps = require("lib.string_ops")
+local Player = require("lib.player")
 
 local SecondarySid = {}
 
@@ -205,7 +206,7 @@ function SecondarySid.cycle_track(direction)
 	if new_index == 0 then
 		msg.info("Cycling secondary subtitle: disabled")
 		mp.set_property("secondary-sid", "no")
-		mp.osd_message("Secondary Sub: Disabled")
+		Player.notify("Secondary Sub: Disabled", "info")
 	else
 		local new_track = sub_tracks[new_index]
 		local lang = new_track.lang and (" [" .. new_track.lang .. "]") or ""
@@ -213,7 +214,7 @@ function SecondarySid.cycle_track(direction)
 
 		msg.info(string.format("Cycling secondary subtitle: %d%s%s", new_track.id, lang, title))
 		mp.set_property("secondary-sid", tostring(new_track.id))
-		mp.osd_message(string.format("Secondary Sub: %d%s%s", new_track.id, lang, title))
+		Player.notify(string.format("Secondary Sub: %d%s%s", new_track.id, lang, title), "info")
 	end
 end
 
