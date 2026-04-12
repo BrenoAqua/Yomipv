@@ -168,7 +168,7 @@ function History:open(request_state)
 		self.auto_scroll = (self.scroll_top_index == max_idx)
 		self:update()
 	end)
-	mp.add_forced_key_binding("x", "menu-clear-history", function()
+	mp.add_forced_key_binding(self.config.key_history_clear, "menu-clear-history", function()
 		self:clear_history()
 	end)
 

@@ -14,12 +14,6 @@ local BRACKET_PATTERNS = {
 	"%[[^%]]-%]", -- Square brackets
 	"【[^】]-】", -- Lenticular brackets
 }
-local TITLE_CLEAN_PATTERNS = {
-	"[%.%s_]+[Ss]%d+[Ee]%d+", -- S01E01
-	"[%.%s_]+[Ee]%d+", -- E01
-	"[%.%d]+$", -- Trailing numbers/dots
-	"%.%w+$", -- Extensions
-}
 
 -- Normalizes whitespace and optionally preserves newlines
 function StringOps.clean_text(text, preserve_newlines)
@@ -125,50 +119,87 @@ function StringOps.clean_title(title, path)
 	-- Strip extension once at the start
 	s = s:gsub("%.%w+$", "")
 
-	-- Strip brackets
-	for _, pattern in ipairs(BRACKET_PATTERNS) do
-		s = s:gsub(pattern, "")
-	end
+	-- Strip hex checksums
+	s = s:gsub("[%[%(]%x%x%x%x%x%x%x%x[%]%]%)]", "")
 
-	-- Normalize spacing and trim
-	s = StringOps.trim(StringOps.normalize_spacing(s))
+	-- Strip leading group tag
+	s = s:gsub("^%[[^%]]+%]%s*", "")
+	s = s:gsub("^%([^%)]+%)%s*", "")
 
-	-- Strip common quality/codec tags
+	-- Strip quality and codec tags
 	local tags = {
-		"1080[pP]", "720[pP]", "480[pP]",
+		"1080[pP]", "720[pP]", "480[pP]", "2160[pP]", "1440[pP]", "576[pP]",
+		"[0-9]+[xX][0-9]+",
 		"[xX]26[45]", "[hH]%.?26[45]", "[hH][eE][vV][cC]",
 		"[aA][cC]3", "[aA][aA][cC]", "[mM][pP]3", "[fF][lL][aA][cC][0-9%.]*",
-		"[dD][dD][pP][0-9%.]*", "[hH][iI]10[pP]?",
+		"[dD][dD][pP][0-9%.]*", "[hH][iI]10[pP]?", "[0-9]+%-?bit",
 		"[nN][fF]", "[wW][eE][bB]%-?[dD][lL]", "[bB][lL][uU]%-?[rR][aA][yY]",
 		"[mM][uU][lL][tT][iI][^%s%.%-_]*", "[mM][sS][uU][bB][sS]?", "[dD][uU][aA][lL]",
-		"[yY][uU][rR][aA][sS][uU][kK][aA]", "[tT][oO][oO][nN][sS][hH][uU][bB]",
-		"[0-9]+%-[bB][iI][tT]"
+		"[yY][uU][rR][aA][sS][uU][kK][aA]", "[tT][oO][oO][nN][sS]?[hH][uU][bB]?",
+		"[0-9]+%-[bB][iI][tT]",
+		"[uU][nN][cC][eE][nN][sS][oO][rR][eE][dD]", "[cC][eE][nN][sS][oO][rR][eE][dD]",
+		"[bB][aA][tT][cC][hH]", "[rR][eE][pP][aA][cC][kK]", "[pP][rR][oO][pP][eE][rR]",
+		"[bB][dD][rR][iI][pP]?", "[bB][dD]", "[tT][vV]", "[wW][eE][bB]",
+		"[vV][pP]9", "[aA][vV]1", "[xX][vV][iI][dD]",
+		"[sS][pP][eE][cC][iI][aA][lL]", "[oO][vV][aA]", "[oO][nN][aA]", "[oO][aA][dD]",
+		"[aA][mM][zZ][nN]", "[jJ][pP][nN]", "[dD][sS][nN][pP]", "[cC][rR]", "[fF][uU][nN][iI]",
+		"[aA][bB][eE][mM][aA]", "[wW][oO][wW][oO][wW]", "[bB][sS]%-?[0-9]*", "[aA][tT]%-?[xX]",
+		"[mM][xX]", "[tT][vV][kK]", "[tT][vV][oO]", "[aA][nN][yY][iI][vV]", "[hH][iI][dD][iI][vV][eE]",
+		"[pP][rR][iI][mM][eE]"
 	}
 
 	for _, tag in ipairs(tags) do
-		s = s:gsub("[%s%.%-_]" .. tag .. "[%s%.%-_]", " ")
-		s = s:gsub("[%s%.%-_]" .. tag .. "$", "")
-		s = s:gsub("^" .. tag .. "[%s%.%-_]", "")
+		-- Clean tags inside delimiters
+		s = s:gsub("[%s%.%-%_%[%(]" .. tag .. "[%s%.%-%_%]%)/]", " ")
+		s = s:gsub("[%s%.%-%_%[%(]" .. tag .. "$", "")
+		s = s:gsub("^" .. tag .. "[%s%.%-%_%]%)/]", "")
 	end
 
-	-- Strip episode separators and numbers
-	s = s:gsub("[%s%.%-_]+[0-9]+[vV][0-9]+$", "") -- 01v2
-	s = s:gsub("[%s%.%-_]+[0-9]+$", "")
-
-	-- Strip season/episode tags
-	for _, pattern in ipairs(TITLE_CLEAN_PATTERNS) do
-		if pattern ~= "%.%w+$" then
-			s = s:gsub(pattern, "")
-		end
+	-- Clean empty or punctuation brackets
+	for _ = 1, 3 do -- Recursive cleanup for nested or sequential brackets
+		s = s:gsub("%([%s%.%-_]*%)", "")
+		s = s:gsub("%[[%s%.%-_]*%]", "")
+		s = s:gsub("【[%s%.%-_]*】", "")
 	end
+
+	s = StringOps.trim(StringOps.normalize_spacing(s))
 
 	-- Strip version tags
-	s = s:gsub("[vV][0-9]+$", "")
-	s = s:gsub("[ _%-][Vv][0-9]+", "")
+	s = s:gsub("[%[%s%.%-_][vV][0-9]+[%]%s%.%-_]*$", "")
+	s = s:gsub("[%[%s%.%-_][Vv][0-9]+[%]%s%.%-_]*", " ")
 
-	-- Strip years (19xx, 20xx)
-	s = s:gsub("[%s%.%-_][12][0-9][0-9][0-9][%s%.%-_]", " ")
-	s = s:gsub("[%s%.%-_][12][0-9][0-9][0-9]$", "")
+	-- Strip release years
+	s = s:gsub("[%[%s%.%-_%(][12][0-9][0-9][0-9][%]%s%.%-_%)]", " ")
+	s = s:gsub("[%[%s%.%-_%(][12][0-9][0-9][0-9]$", "")
+
+	-- Strip standalone info
+	s = s:gsub("[%s%.%-_]%([Tt][Vv]%)", "")
+	s = s:gsub("[%s%.%-_]%([Mm][Oo][Vv][Ii][Ee]%)", "")
+	s = s:gsub("[%s%.%-_]%([Oo][Vv][Aa]%)", "")
+	s = s:gsub("[%s%.%-_]%([Oo][Nn][Aa]%)", "")
+
+	-- Clean empty brackets
+	for _ = 1, 2 do
+		s = s:gsub("%([%s%.%-_]*%)", "")
+		s = s:gsub("%[[%s%.%-_]*%]", "")
+		s = s:gsub("【[%s%.%-_]*】", " ")
+	end
+
+	-- Strip season, episode, and version tags
+	local cleaner_patterns = {
+		"[%.%s_]+[Ss]%d+[Ee]%d+",
+		"[%.%s_]+[Ee]%d+",
+		"[%.%s_]+[Ss]eason%s*%d+",
+		"[%.%s_]+%d+[a-z][a-z]%s+[Ss]eason",
+		"[%.%s_]+[Ss]%d+",
+		"[%.%s_%[%(]+[0-9]+[vV][0-9]+[%]%)%s%.%-_]*$",
+		"[%s%.%-%_]+[0-9]+$"
+	}
+
+	for _, pattern in ipairs(cleaner_patterns) do
+		s = StringOps.trim(s)
+		s = s:gsub(pattern, "")
+	end
 
 	-- Strip trailing punctuation and delimiters
 	s = s:gsub("[%s%-%:_%.]+$", "")
@@ -182,6 +213,21 @@ end
 function StringOps.parse_season_episode(title, path)
 	local source = title or path or ""
 	source = source:gsub("%.%w+$", "")
+
+	local season, episode
+
+	-- Combined S01E01 format
+	season, episode = source:match("[Ss](%d+)[Ee](%d+)")
+
+	-- Independent season detection (before stripping brackets/parentheses)
+	if not season then
+		season = source:match("[ _%.%-][Ss]eason%s*(%d+)")
+			or source:match("[ _%.%-][Ss](%d+)[ _%.%-]")
+			or source:match("[ _%.%-][Ss](%d+)$")
+			or source:match("^(%d+)[a-z][a-z]%s+[Ss]eason")
+			or source:match("[%( ][ _%.%-]?(%d+)[a-z][a-z]%s+[Ss]eason")
+	end
+
 	-- Strip common tags/info that interfere with episode detection
 	source = source:gsub("%[[^%]]-%]", "")
 	source = source:gsub("%([^%)]-%)", "")
@@ -207,16 +253,12 @@ function StringOps.parse_season_episode(title, path)
 	source = source:gsub("[%s%.%-_][bB][lLuU]%-?[rR][aA][yY]", "")
 	source = source:gsub("[%s%.%-_][mM][uU][lL][tT][iI][^%s%.%-_]*", "")
 
-	local season, episode
-
-	season, episode = source:match("[Ss](%d+)[Ee](%d+)")
-
-	if not season and not episode then
-		episode = source:match("[ _%.%-][Ee][Pp]?%s*(%d+)") or source:match("^[Ee][Pp]?%s*(%d+)")
-	end
-
-	if not season and not episode then
-		episode = source:match("([0-9]+)[^0-9]*$")
+	-- Independent episode detection
+	if not episode then
+		episode = source:match("[ _%.%-][Ee][Pp]?%s*(%d+)")
+			or source:match("^[Ee][Pp]?%s*(%d+)")
+			-- Trailing number that isn't part of a season tag
+			or source:match("[ _%.%-](%d+)[^0-9]*$")
 	end
 
 	return season, episode
@@ -260,24 +302,41 @@ function StringOps.contains_any(text, keywords)
 	return false
 end
 
--- Detect Japanese/CJK characters (Hiragana, Katakana, Kanji)
 function StringOps.has_japanese(text)
 	if not text or text == "" then
 		return false
 	end
 
-	-- UTF-8 ranges for Japanese/CJK
-	-- Hiragana: [0x3040, 0x309F]
-	-- Katakana: [0x30A0, 0x30FF]
-	-- Kanji (CJK Unified Ideographs): [0x4E00, 0x9FAF]
-	-- Half-width Katakana: [0xFF66, 0xFF9F]
+	-- UTF-8 byte match check for Hiragana, Katakana, and Kanji ranges
+	return text:find("[\227][\128-\131]") ~= nil
+		or text:find("[\228-\233]") ~= nil
+		or text:find("[\239][\189-\190]") ~= nil
+end
 
-	-- Check for common Japanese UTF-8 byte sequences
-	-- E3 81-83: Hiragana/Katakana
-	-- E4-E9: Kanji
-	local found = text:find("[\227][\128-\131]") or text:find("[\228-\233]") or text:find("[\239][\189-\190]")
+function StringOps.is_hiragana_only(text)
+	if not text or text == "" then return false end
+	local char_count, hiragana_count = 0, 0
+	for _, code in StringOps.utf8_codes(text) do
+		-- Hiragana range: U+3041 to U+309F
+		if code >= 0x3041 and code <= 0x309F then
+			hiragana_count = hiragana_count + 1
+		end
+		char_count = char_count + 1
+	end
+	return char_count > 0 and char_count == hiragana_count
+end
 
-	return found ~= nil
+function StringOps.is_katakana_only(text)
+	if not text or text == "" then return false end
+	local char_count, katakana_count = 0, 0
+	for _, code in StringOps.utf8_codes(text) do
+		-- Katakana range: U+30A0 to U+30FF
+		if code >= 0x30A0 and code <= 0x30FF then
+			katakana_count = katakana_count + 1
+		end
+		char_count = char_count + 1
+	end
+	return char_count > 0 and char_count == katakana_count
 end
 
 -- Iterator that yields (next_index, codepoint)

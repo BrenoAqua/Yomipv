@@ -197,4 +197,30 @@ function AnkiDBBuilder.save_database(_, word_data, fields, callback)
 	callback(true, nil)
 end
 
+function AnkiDBBuilder:build_with_notification(handler)
+	local Player = require("lib.player")
+
+	self.on_progress = function(current, total)
+		local percent = math.floor((current / total) * 100)
+		local progress = current / total
+		local bar = string.rep("▰", math.floor(progress * 15)) .. string.rep("▱", 15 - math.floor(progress * 15))
+		Player.notify(string.format("Building Anki database... %s %d%%", bar, percent), "info", 1)
+	end
+
+	Player.notify("Building Anki database...", "info", 5)
+
+	self:build(function(success, err)
+		if success then
+			Player.notify("Anki database built successfully", "success")
+			require("lib.anki_db").reload()
+			if handler and handler.current_tokens then
+				handler:on_current_tokens_ready(handler.current_tokens)
+			end
+		else
+			Player.notify("Failed to build Anki database", "error")
+			msg.error("AnkiDB build failed: " .. tostring(err))
+		end
+	end)
+end
+
 return AnkiDBBuilder
