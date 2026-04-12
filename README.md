@@ -3,14 +3,15 @@
 </p>
 
 <h1 align="center">Yomipv</h1>
+
+<p align="center">An immersion-focused workflow for looking up and mining words without leaving MPV</p>
+
 <p align="center">
   <img src="https://img.shields.io/github/v/release/BrenoAqua/Yomipv?color=blue" alt="Version">
   <a href="https://github.com/sponsors/BrenoAqua"><img src="https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=flat&logo=github-sponsors" alt="Sponsor"></a>
   <img src="https://img.shields.io/github/downloads/BrenoAqua/Yomipv/total?color=orange" alt="Downloads">
   <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License">
 </p>
-
-<p align="center">An immersion-focused workflow for looking up and mining words without leaving MPV</p>
 
 <p align="center">
   <a href="#requirements">Requirements</a> •
