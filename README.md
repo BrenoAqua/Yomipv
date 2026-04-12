@@ -10,9 +10,11 @@
   <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License">
 </p>
 
-<p align="center">An immersion-centric workflow for looking up and mining words without leaving MPV</p>
+<p align="center">An immersion-focused workflow for looking up and mining words without leaving MPV</p>
 
 ---
+
+<h3 align="center">Preview</h3>
 
 https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 
