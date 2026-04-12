@@ -9,6 +9,43 @@ const entryCounter = document.getElementById('entry-counter');
 let isWindowVisible = false;
 let isPerformingLookup = false;
 
+const clearSelection = () => {
+  window.getSelection().removeAllRanges();
+  document.querySelectorAll('.highlight').forEach(el => {
+    const parent = el.parentNode;
+    while (el.firstChild) {
+      parent.insertBefore(el.firstChild, el);
+    }
+    parent.removeChild(el);
+  });
+  ipcRenderer.send('sync-selection', '');
+
+  // If a dictionary was selected, refresh its state in MPV without the highlights
+  const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
+  const targetDict = selectedTitle?.parentElement;
+  if (targetDict) {
+    sendSelectedDict(targetDict);
+  }
+};
+
+const syncSelection = () => {
+  const selectionObj = window.getSelection();
+  if (selectionObj.rangeCount === 0 || selectionObj.isCollapsed) return;
+
+  const range = selectionObj.getRangeAt(0);
+  if (!glossaryEl.contains(range.commonAncestorContainer)) return;
+
+  let selection = selectionObj.toString().trim();
+  if (!selection) return;
+
+  selection = selection.replace(/\r?\n/g, '<br>');
+
+  const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
+  const formattedSelection = selectedTitle ? `<b>${selection}</b>` : selection;
+
+  ipcRenderer.send('sync-selection', formattedSelection);
+};
+
 let allEntries = [];
 let currentEntryIndex = 0;
 let currentShowFrequencies = false;
@@ -256,6 +293,7 @@ const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents) => {
       });
       titleEl.classList.add('selected');
       sendSelectedDict(el);
+      syncSelection();
     });
   });
 
@@ -285,6 +323,12 @@ const sendSelectedDict = (el) => {
     link.style.removeProperty('cursor');
     if (!link.style.cssText) link.removeAttribute('style');
   });
+
+  // Strip highlight class from the export HTML so Anki gets clean <b> tags
+  exportEl.querySelectorAll('.highlight').forEach(el => {
+    el.removeAttribute('class');
+  });
+
   const exportTitle = exportEl.firstElementChild;
   if (exportTitle) {
     if (exportTitle.dataset.originalTitle) {
@@ -317,6 +361,8 @@ const sendSelectedDict = (el) => {
 const performLookup = async (term, showFrequencies, showPitchAccents, isBack = false, prioritizeKanjiMatch, prioritizeHiraganaMatch) => {
   console.log('[UI] Performing lookup for:', term);
   
+  clearSelection();
+
   const container = document.getElementById('lookup-container');
   const isVisible = container.classList.contains('visible');
 
@@ -618,8 +664,95 @@ ipcRenderer.on('lookup-term', async (event, data) => {
     document.body.classList.remove('light-theme');
   }
 
+  if (data.customCss) {
+    let customLink = document.getElementById('custom-css');
+    if (!customLink) {
+      customLink = document.createElement('link');
+      customLink.id = 'custom-css';
+      customLink.rel = 'stylesheet';
+      document.head.appendChild(customLink);
+    }
+    let cssUrl = data.customCss;
+    if (!cssUrl.startsWith('http') && !cssUrl.startsWith('file://')) {
+      cssUrl = 'file:///' + cssUrl.replace(/\\/g, '/');
+    }
+    if (customLink.href !== cssUrl) {
+      customLink.href = cssUrl;
+    }
+  } else {
+    const customLink = document.getElementById('custom-css');
+    if (customLink) customLink.remove();
+  }
+
   lookupHistory = [];
   performLookup(data.term, data.showFrequencies, data.showPitchAccents, false, data.prioritizeKanjiMatch, data.prioritizeHiraganaMatch);
+});
+
+ipcRenderer.on('copy-selection', () => {
+  const selection = window.getSelection().toString();
+  if (selection) {
+    require('electron').clipboard.writeText(selection);
+  }
+  clearSelection();
+});
+
+document.body.addEventListener('contextmenu', (e) => {
+  const hasSelection = window.getSelection().toString().length > 0;
+  ipcRenderer.send('show-context-menu', hasSelection);
+});
+
+ipcRenderer.on('refresh-css', () => {
+  const customLink = document.getElementById('custom-css');
+  if (customLink) {
+    const url = new URL(customLink.href);
+    url.searchParams.set('t', Date.now().toString());
+    customLink.href = url.toString();
+    console.log('[UI] CSS refreshed:', customLink.href);
+  }
+});
+
+ipcRenderer.on('inspector-mode', (event, active) => {
+  const container = document.getElementById('lookup-container');
+  if (active) {
+    container.style.cursor = 'move';
+
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    container._onMouseDown = (e) => {
+      if (e.target.closest('button, a, input, select')) return;
+      dragging = true;
+      startX = e.screenX;
+      startY = e.screenY;
+      e.preventDefault();
+    };
+
+    container._onMouseMove = (e) => {
+      if (!dragging) return;
+      const dx = e.screenX - startX;
+      const dy = e.screenY - startY;
+      startX = e.screenX;
+      startY = e.screenY;
+      ipcRenderer.send('move-window', { dx, dy });
+    };
+
+    container._onMouseUp = () => { dragging = false; };
+
+    container.addEventListener('mousedown', container._onMouseDown);
+    window.addEventListener('mousemove', container._onMouseMove);
+    window.addEventListener('mouseup', container._onMouseUp);
+  } else {
+    container.style.cursor = '';
+    if (container._onMouseDown) {
+      container.removeEventListener('mousedown', container._onMouseDown);
+      window.removeEventListener('mousemove', container._onMouseMove);
+      window.removeEventListener('mouseup', container._onMouseUp);
+      container._onMouseDown = null;
+      container._onMouseMove = null;
+      container._onMouseUp = null;
+    }
+  }
 });
 
 ipcRenderer.on('window-hide-request', () => {
@@ -661,16 +794,7 @@ let selectionTimeout;
 document.addEventListener('selectionchange', () => {
   clearTimeout(selectionTimeout);
   selectionTimeout = setTimeout(() => {
-    const selectionObj = window.getSelection();
-    if (selectionObj.rangeCount === 0 || selectionObj.isCollapsed) return;
-
-    const range = selectionObj.getRangeAt(0);
-    if (!glossaryEl.contains(range.commonAncestorContainer)) return;
-
-    let selection = selectionObj.toString().trim();
-    if (!selection) return;
-    selection = selection.replace(/\r?\n/g, '<br>');
-    ipcRenderer.send('sync-selection', selection);
+    syncSelection();
   }, 200);
 });
 
@@ -699,13 +823,13 @@ document.addEventListener('mouseup', () => {
   const hasBlocks = contents.querySelector('div, p, li, ol, ul');
 
   if (!hasBlocks) {
-    const span = document.createElement('span');
-    span.className = 'highlight';
+    const b = document.createElement('b');
+    b.className = 'highlight';
     try {
-      range.surroundContents(span);
+      range.surroundContents(b);
     } catch (e) {
-      span.appendChild(range.extractContents());
-      range.insertNode(span);
+      b.appendChild(range.extractContents());
+      range.insertNode(b);
     }
   }
 

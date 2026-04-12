@@ -95,6 +95,24 @@ merge_config() {
     fi
 }
 
+backup_css() {
+    local css_file="$SCRIPT_DIR/script-opts/yomipv.css"
+    if [ -f "$css_file" ]; then
+        cp "$css_file" "${css_file}.tmp_backup"
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+restore_css() {
+    local has_css="$1"
+    local css_file="$SCRIPT_DIR/script-opts/yomipv.css"
+    if [ "$has_css" = "1" ] && [ -f "${css_file}.tmp_backup" ]; then
+        mv "${css_file}.tmp_backup" "$css_file"
+    fi
+}
+
 update_from_source() {
     echo -e "${CYAN}Updating from source (main branch)...${NC}"
     local zip_url="https://github.com/$REPO/archive/refs/heads/main.zip"
@@ -103,6 +121,7 @@ update_from_source() {
     curl -L -A "$USER_AGENT" -o "$temp_zip" "$zip_url"
     
     local old_conf=$(get_config)
+    local has_css=$(backup_css)
     local extract_dir="/tmp/yomipv-extract"
     rm -rf "$extract_dir" && mkdir -p "$extract_dir"
     
@@ -114,8 +133,9 @@ update_from_source() {
         local mpv_instances=$(get_mpv_instances)
         stop_yomipv_processes
         
-        # Copy everything except .git
+        # Copy source files excluding git metadata
         cp -r "$source_folder"* "$SCRIPT_DIR/"
+        restore_css "$has_css"
         merge_config "$old_conf"
         restart_mpv_instances "$mpv_instances"
     fi
@@ -139,10 +159,12 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
     
     echo -e "${GREEN}New updates available. Pulling...${NC}"
     local old_conf=$(get_config)
+    local has_css=$(backup_css)
     local mpv_instances=$(get_mpv_instances)
     stop_yomipv_processes
     
     git pull origin main
+    restore_css "$has_css"
     merge_config "$old_conf"
     restart_mpv_instances "$mpv_instances"
     
@@ -224,11 +246,13 @@ TEMP_ZIP="/tmp/yomipv-update.zip"
 curl -L -A "$USER_AGENT" -o "$TEMP_ZIP" "$ZIP_URL"
 
 old_conf=$(get_config)
+has_css=$(backup_css)
 mpv_instances=$(get_mpv_instances)
 stop_yomipv_processes
 
 echo -e "${GREEN}Extracting update...${NC}"
 unzip -o -q "$TEMP_ZIP" -d "$SCRIPT_DIR"
+restore_css "$has_css"
 merge_config "$old_conf"
 restart_mpv_instances "$mpv_instances"
 
