@@ -13,6 +13,7 @@ The lookup window appears when you search for a word. Depending on your configur
 Right-click anywhere inside the lookup window to open the **Context Menu**
 
 ### Context Menu
+- **Copy**: Copies the currently selected text to the clipboard (only enabled when text is selected)
 - **Inspect Element**: Opens the developer tools (Inspector) for the lookup window.
 - **Refresh CSS**: Instantly reloads your custom styles from `yomipv.css` (see [Custom Styling](#custom-styling))
 
@@ -38,6 +39,7 @@ You can also start a new search directly from the lookup window header:
 
 ### Selecting Text
 - Just like in Yomitan’s popup, you can select any text inside definitions to populate your Selection Text field in Anki when `popup-selection-text` is being used
+- **Copy to Clipboard**: Press `Ctrl+c` while text is selected inside the lookup window to copy it to your clipboard. This also clears the current selection
 
 ### Choosing a Specific Dictionary
 - **Click the Dictionary Title** to select that specific dictionary to populate the Definition field in Anki if `selected-dict` is being used
