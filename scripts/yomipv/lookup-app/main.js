@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const http = require('http');
 const net = require('net');
@@ -166,6 +166,152 @@ app.on('window-all-closed', () => {
 
 ipcMain.on('hide-window', () => {
   mainWindow.hide();
+});
+
+ipcMain.on('move-window', (event, { dx, dy }) => {
+  if (!mainWindow) return;
+  const [x, y] = mainWindow.getPosition();
+  mainWindow.setPosition(x + dx, y + dy);
+});
+
+let devToolsWin = null;
+
+let inspectorTray = null;
+
+function createInspectorTray() {
+  const iconPath = path.join(__dirname, 'build', 'lookup-app.png');
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  inspectorTray = new Tray(icon);
+  inspectorTray.setToolTip('Yomipv Inspector');
+
+  const updateMenu = () => {
+    const menu = Menu.buildFromTemplate([
+      {
+        label: 'Show Inspector',
+        click: () => {
+          if (devToolsWin) {
+            if (devToolsWin.isMinimized()) devToolsWin.restore();
+            devToolsWin.show();
+            devToolsWin.focus();
+          }
+        }
+      },
+      {
+        label: 'Close Inspector',
+        click: () => {
+          if (devToolsWin && !devToolsWin.isDestroyed()) devToolsWin.close();
+        }
+      }
+    ]);
+    inspectorTray.setContextMenu(menu);
+  };
+
+  updateMenu();
+  inspectorTray.on('click', () => {
+    if (devToolsWin) {
+      if (devToolsWin.isMinimized()) devToolsWin.restore();
+      devToolsWin.show();
+      devToolsWin.focus();
+    }
+  });
+}
+
+function destroyInspectorTray() {
+  if (inspectorTray) {
+    inspectorTray.destroy();
+    inspectorTray = null;
+  }
+}
+
+function openInspector() {
+  if (!mainWindow) return;
+  
+  if (devToolsWin && !devToolsWin.isDestroyed()) {
+    if (devToolsWin.isMinimized()) devToolsWin.restore();
+    devToolsWin.show();
+    devToolsWin.focus();
+    return;
+  }
+
+  devToolsWin = new BrowserWindow({
+    width: 800,
+    height: 600,
+    title: "Yomipv Inspector",
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    autoHideMenuBar: true
+  });
+
+  devToolsWin.setAlwaysOnTop(true, 'screen-saver', 2);
+
+  mainWindow.webContents.setDevToolsWebContents(devToolsWin.webContents);
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
+
+  devToolsWin.webContents.once('dom-ready', () => {
+    devToolsWin.webContents.executeJavaScript(
+      "UI.inspectorView.showPanel('elements')"
+    ).catch(() => {});
+  });
+
+  // Enable manual window repositioning during inspection
+  mainWindow.setMovable(true);
+  mainWindow.setFocusable(true);
+  mainWindow.webContents.send('inspector-mode', true);
+
+  const savedPosition = mainWindow.getPosition();
+
+  createInspectorTray();
+
+  const onInspectorClose = () => {
+    destroyInspectorTray();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setPosition(savedPosition[0], savedPosition[1]);
+      mainWindow.setMovable(false);
+      mainWindow.setFocusable(false);
+      mainWindow.webContents.send('inspector-mode', false);
+    }
+  };
+
+  mainWindow.webContents.once('devtools-closed', () => {
+    onInspectorClose();
+    if (devToolsWin && !devToolsWin.isDestroyed()) {
+      devToolsWin.close();
+    }
+    devToolsWin = null;
+  });
+
+  devToolsWin.on('closed', () => {
+    onInspectorClose();
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+    }
+    devToolsWin = null;
+  });
+}
+
+ipcMain.on('open-inspector', () => {
+  openInspector();
+});
+
+ipcMain.on('show-context-menu', (event) => {
+  const template = [
+    {
+      label: 'Inspect Element',
+      click: () => {
+        openInspector();
+      }
+    },
+    {
+      label: 'Refresh CSS',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.webContents.send('refresh-css');
+        }
+      }
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  menu.popup(BrowserWindow.fromWebContents(event.sender));
 });
 
 ipcMain.on('sync-selection', (event, text) => {

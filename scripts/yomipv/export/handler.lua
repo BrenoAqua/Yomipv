@@ -975,6 +975,12 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 			self.active_entry_reading = nil
 			self.pending_lookup_term = data.term
 			self.pending_lookup_reading = data.reading
+
+			local custom_css = mp.command_native({ "expand-path", "~~/script-opts/yomipv.css" })
+			if require("mp.utils").file_info(custom_css) == nil then
+				custom_css = nil
+			end
+
 			local data_to_send = {
 				term = data.term,
 				reading = data.reading,
@@ -983,6 +989,7 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 				prioritizeKanjiMatch = self.config.prioritize_kanji_match,
 				prioritizeHiraganaMatch = self.config.prioritize_hiragana_match,
 				theme = self.config.lookup_theme,
+				customCss = custom_css,
 			}
 			local json_body = require("mp.utils").format_json(data_to_send)
 			Curl.post("http://127.0.0.1:19634", json_body, function() end)

@@ -618,8 +618,86 @@ ipcRenderer.on('lookup-term', async (event, data) => {
     document.body.classList.remove('light-theme');
   }
 
+  if (data.customCss) {
+    let customLink = document.getElementById('custom-css');
+    if (!customLink) {
+      customLink = document.createElement('link');
+      customLink.id = 'custom-css';
+      customLink.rel = 'stylesheet';
+      document.head.appendChild(customLink);
+    }
+    let cssUrl = data.customCss;
+    if (!cssUrl.startsWith('http') && !cssUrl.startsWith('file://')) {
+      cssUrl = 'file:///' + cssUrl.replace(/\\/g, '/');
+    }
+    if (customLink.href !== cssUrl) {
+      customLink.href = cssUrl;
+    }
+  } else {
+    const customLink = document.getElementById('custom-css');
+    if (customLink) customLink.remove();
+  }
+
   lookupHistory = [];
   performLookup(data.term, data.showFrequencies, data.showPitchAccents, false, data.prioritizeKanjiMatch, data.prioritizeHiraganaMatch);
+});
+
+document.body.addEventListener('contextmenu', (e) => {
+  ipcRenderer.send('show-context-menu');
+});
+
+ipcRenderer.on('refresh-css', () => {
+  const customLink = document.getElementById('custom-css');
+  if (customLink) {
+    const url = new URL(customLink.href);
+    url.searchParams.set('t', Date.now().toString());
+    customLink.href = url.toString();
+    console.log('[UI] CSS refreshed:', customLink.href);
+  }
+});
+
+ipcRenderer.on('inspector-mode', (event, active) => {
+  const container = document.getElementById('lookup-container');
+  if (active) {
+    container.style.cursor = 'move';
+
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    container._onMouseDown = (e) => {
+      if (e.target.closest('button, a, input, select')) return;
+      dragging = true;
+      startX = e.screenX;
+      startY = e.screenY;
+      e.preventDefault();
+    };
+
+    container._onMouseMove = (e) => {
+      if (!dragging) return;
+      const dx = e.screenX - startX;
+      const dy = e.screenY - startY;
+      startX = e.screenX;
+      startY = e.screenY;
+      ipcRenderer.send('move-window', { dx, dy });
+    };
+
+    container._onMouseUp = () => { dragging = false; };
+
+    container.addEventListener('mousedown', container._onMouseDown);
+    window.addEventListener('mousemove', container._onMouseMove);
+    window.addEventListener('mouseup', container._onMouseUp);
+  } else {
+    container.style.cursor = '';
+    if (container._onMouseDown) {
+      container.removeEventListener('mousedown', container._onMouseDown);
+      window.removeEventListener('mousemove', container._onMouseMove);
+      window.removeEventListener('mouseup', container._onMouseUp);
+      container._onMouseDown = null;
+      container._onMouseMove = null;
+      container._onMouseUp = null;
+    }
+  }
 });
 
 ipcRenderer.on('window-hide-request', () => {

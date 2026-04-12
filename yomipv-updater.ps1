@@ -115,6 +115,22 @@ function Merge-Config ($OldConfig) {
     }
 }
 
+function Backup-Css {
+    $css_path = Join-Path $PSScriptRoot "script-opts\yomipv.css"
+    if (Test-Path $css_path) {
+        Copy-Item -Path $css_path -Destination "$css_path.tmp_backup" -Force
+        return $true
+    }
+    return $false
+}
+
+function Restore-Css ($has_css) {
+    if ($has_css) {
+        $css_path = Join-Path $PSScriptRoot "script-opts\yomipv.css"
+        Move-Item -Path "$css_path.tmp_backup" -Destination $css_path -Force
+    }
+}
+
 function Update-Dependencies {
     $app_dir = Join-Path $PSScriptRoot "scripts\yomipv\lookup-app"
     if (Test-Path (Join-Path $app_dir "package.json")) {
@@ -238,7 +254,9 @@ function Update-Yomipv {
         
         Write-Host "New updates available. Pulling..." -ForegroundColor Green
         $oldConfig = Get-Config
+        $hasCss = Backup-Css
         git pull origin main
+        Restore-Css $hasCss
         Merge-Config $oldConfig
         return $true
     }
@@ -263,6 +281,7 @@ function Update-Yomipv {
         Install-7z
         
         $oldConfig = Get-Config
+        $hasCss = Backup-Css
         
         $extract_dir = Join-Path $env:TEMP "yomipv-extract"
         if (Test-Path $extract_dir) { Remove-Item $extract_dir -Recurse -Force }
@@ -274,6 +293,7 @@ function Update-Yomipv {
         if ($source_folder) {
             Write-Host "Applying source changes..." -ForegroundColor Green
             Copy-Item -Path (Join-Path $source_folder.FullName "*") -Destination $PSScriptRoot -Recurse -Force
+            Restore-Css $hasCss
             Merge-Config $oldConfig
         }
         
@@ -329,11 +349,13 @@ function Update-Yomipv {
         if (-not $zip_url) { throw "Could not find a valid download URL." }
         
         $oldConfig = Get-Config
+        $hasCss = Backup-Css
         
         $temp_zip = Join-Path $env:TEMP "yomipv-update.zip"
         Receive-Archive $temp_zip $zip_url
         Install-7z
         Expand-YomipvArchive $temp_zip $PSScriptRoot
+        Restore-Css $hasCss
         Merge-Config $oldConfig
         
         Remove-Item $temp_zip -ErrorAction Ignore
