@@ -97,6 +97,15 @@ app.whenReady().then(() => {
           return;
         }
 
+        if (req.url === '/copy') {
+          console.log('[IPC] Copy signal received');
+          res.end('ok');
+          if (mainWindow) {
+            mainWindow.webContents.send('copy-selection');
+          }
+          return;
+        }
+
         if (req.url === '/hide') {
           console.log('[IPC] Hide signal received, requesting renderer clear');
           res.end('hiding');
@@ -293,8 +302,18 @@ ipcMain.on('open-inspector', () => {
   openInspector();
 });
 
-ipcMain.on('show-context-menu', (event) => {
+ipcMain.on('show-context-menu', (event, hasSelection) => {
   const template = [
+    {
+      label: 'Copy',
+      enabled: hasSelection,
+      click: () => {
+        if (mainWindow) {
+          mainWindow.webContents.send('copy-selection');
+        }
+      }
+    },
+    { type: 'separator' },
     {
       label: 'Inspect Element',
       click: () => {

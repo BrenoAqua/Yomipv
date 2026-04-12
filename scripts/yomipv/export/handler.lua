@@ -967,6 +967,22 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 			end
 		end,
 		on_lookup = function(data)
+			if self.last_selection then
+				mp.command_native_async({
+					name = "subprocess",
+					playback_only = false,
+					args = {
+						Platform.get_curl_cmd(),
+						"-s",
+						"-X",
+						"POST",
+						"--connect-timeout",
+						"1",
+						"http://127.0.0.1:19634/copy",
+					},
+				}, function() end)
+				return
+			end
 			if self.pending_lookup_term == data.term and self.pending_lookup_reading == data.reading then
 				return
 			end

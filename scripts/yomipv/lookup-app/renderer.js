@@ -9,6 +9,43 @@ const entryCounter = document.getElementById('entry-counter');
 let isWindowVisible = false;
 let isPerformingLookup = false;
 
+const clearSelection = () => {
+  window.getSelection().removeAllRanges();
+  document.querySelectorAll('.highlight').forEach(el => {
+    const parent = el.parentNode;
+    while (el.firstChild) {
+      parent.insertBefore(el.firstChild, el);
+    }
+    parent.removeChild(el);
+  });
+  ipcRenderer.send('sync-selection', '');
+
+  // If a dictionary was selected, refresh its state in MPV without the highlights
+  const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
+  const targetDict = selectedTitle?.parentElement;
+  if (targetDict) {
+    sendSelectedDict(targetDict);
+  }
+};
+
+const syncSelection = () => {
+  const selectionObj = window.getSelection();
+  if (selectionObj.rangeCount === 0 || selectionObj.isCollapsed) return;
+
+  const range = selectionObj.getRangeAt(0);
+  if (!glossaryEl.contains(range.commonAncestorContainer)) return;
+
+  let selection = selectionObj.toString().trim();
+  if (!selection) return;
+
+  selection = selection.replace(/\r?\n/g, '<br>');
+
+  const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
+  const formattedSelection = selectedTitle ? `<b>${selection}</b>` : selection;
+
+  ipcRenderer.send('sync-selection', formattedSelection);
+};
+
 let allEntries = [];
 let currentEntryIndex = 0;
 let currentShowFrequencies = false;
@@ -256,6 +293,7 @@ const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents) => {
       });
       titleEl.classList.add('selected');
       sendSelectedDict(el);
+      syncSelection();
     });
   });
 
@@ -285,6 +323,12 @@ const sendSelectedDict = (el) => {
     link.style.removeProperty('cursor');
     if (!link.style.cssText) link.removeAttribute('style');
   });
+
+  // Strip highlight class from the export HTML so Anki gets clean <b> tags
+  exportEl.querySelectorAll('.highlight').forEach(el => {
+    el.removeAttribute('class');
+  });
+
   const exportTitle = exportEl.firstElementChild;
   if (exportTitle) {
     if (exportTitle.dataset.originalTitle) {
@@ -317,6 +361,8 @@ const sendSelectedDict = (el) => {
 const performLookup = async (term, showFrequencies, showPitchAccents, isBack = false, prioritizeKanjiMatch, prioritizeHiraganaMatch) => {
   console.log('[UI] Performing lookup for:', term);
   
+  clearSelection();
+
   const container = document.getElementById('lookup-container');
   const isVisible = container.classList.contains('visible');
 
@@ -642,8 +688,17 @@ ipcRenderer.on('lookup-term', async (event, data) => {
   performLookup(data.term, data.showFrequencies, data.showPitchAccents, false, data.prioritizeKanjiMatch, data.prioritizeHiraganaMatch);
 });
 
+ipcRenderer.on('copy-selection', () => {
+  const selection = window.getSelection().toString();
+  if (selection) {
+    require('electron').clipboard.writeText(selection);
+  }
+  clearSelection();
+});
+
 document.body.addEventListener('contextmenu', (e) => {
-  ipcRenderer.send('show-context-menu');
+  const hasSelection = window.getSelection().toString().length > 0;
+  ipcRenderer.send('show-context-menu', hasSelection);
 });
 
 ipcRenderer.on('refresh-css', () => {
@@ -739,16 +794,7 @@ let selectionTimeout;
 document.addEventListener('selectionchange', () => {
   clearTimeout(selectionTimeout);
   selectionTimeout = setTimeout(() => {
-    const selectionObj = window.getSelection();
-    if (selectionObj.rangeCount === 0 || selectionObj.isCollapsed) return;
-
-    const range = selectionObj.getRangeAt(0);
-    if (!glossaryEl.contains(range.commonAncestorContainer)) return;
-
-    let selection = selectionObj.toString().trim();
-    if (!selection) return;
-    selection = selection.replace(/\r?\n/g, '<br>');
-    ipcRenderer.send('sync-selection', selection);
+    syncSelection();
   }, 200);
 });
 
@@ -777,13 +823,13 @@ document.addEventListener('mouseup', () => {
   const hasBlocks = contents.querySelector('div, p, li, ol, ul');
 
   if (!hasBlocks) {
-    const span = document.createElement('span');
-    span.className = 'highlight';
+    const b = document.createElement('b');
+    b.className = 'highlight';
     try {
-      range.surroundContents(span);
+      range.surroundContents(b);
     } catch (e) {
-      span.appendChild(range.extractContents());
-      range.insertNode(span);
+      b.appendChild(range.extractContents());
+      range.insertNode(b);
     }
   }
 
