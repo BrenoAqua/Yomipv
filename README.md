@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="https://github.com/BrenoAqua/Yomipv/blob/main/scripts/yomipv/lookup-app/build/lookup-app.png?raw=true" width="100" height="100" style="border-radius: 20px" alt="yomipv" />
+    <img src="https://github.com/BrenoAqua/Yomipv/blob/main/scripts/yomipv/lookup-app/build/lookup-app.png?raw=true" width="128" height="128" alt="yomipv" />
 </p>
 
 <h1 align="center">Yomipv</h1>
