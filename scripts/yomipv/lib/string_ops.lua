@@ -14,17 +14,6 @@ local BRACKET_PATTERNS = {
 	"%[[^%]]-%]", -- Square brackets
 	"【[^】]-】", -- Lenticular brackets
 }
-local TITLE_CLEAN_PATTERNS = {
-	"[%.%s_]+[Ss]%d+[Ee]%d+", -- S01E01
-	"[%.%s_]+[Ee]%d+", -- E01
-	"[%.%s_]+[Ss]eason%s*%d+", -- Season 1
-	"[%.%s_]+%d+[a-z][a-z]%s+[Ss]eason", -- 2nd Season
-	"[%.%s_]+[Ss]%d+", -- S1
-	"[%.%s_]+[0-9]+[vV][0-9]+$", -- 01v2
-	"[%.%s_]+[0-9]+$", -- Trailing episode number
-	"[%.%d]+$", -- Trailing numbers/dots
-	"%.%w+$", -- Extensions
-}
 
 -- Normalizes whitespace and optionally preserves newlines
 function StringOps.clean_text(text, preserve_newlines)
@@ -130,51 +119,87 @@ function StringOps.clean_title(title, path)
 	-- Strip extension once at the start
 	s = s:gsub("%.%w+$", "")
 
-	-- Strip brackets
-	for _, pattern in ipairs(BRACKET_PATTERNS) do
-		s = s:gsub(pattern, "")
-	end
+	-- Strip hex checksums
+	s = s:gsub("[%[%(]%x%x%x%x%x%x%x%x[%]%]%)]", "")
 
-	-- Normalize spacing and trim
-	s = StringOps.trim(StringOps.normalize_spacing(s))
+	-- Strip leading group tag
+	s = s:gsub("^%[[^%]]+%]%s*", "")
+	s = s:gsub("^%([^%)]+%)%s*", "")
 
-	-- Strip common quality/codec tags
+	-- Strip quality and codec tags
 	local tags = {
-		"1080[pP]", "720[pP]", "480[pP]",
+		"1080[pP]", "720[pP]", "480[pP]", "2160[pP]", "1440[pP]", "576[pP]",
+		"[0-9]+[xX][0-9]+",
 		"[xX]26[45]", "[hH]%.?26[45]", "[hH][eE][vV][cC]",
 		"[aA][cC]3", "[aA][aA][cC]", "[mM][pP]3", "[fF][lL][aA][cC][0-9%.]*",
-		"[dD][dD][pP][0-9%.]*", "[hH][iI]10[pP]?",
+		"[dD][dD][pP][0-9%.]*", "[hH][iI]10[pP]?", "[0-9]+%-?bit",
 		"[nN][fF]", "[wW][eE][bB]%-?[dD][lL]", "[bB][lL][uU]%-?[rR][aA][yY]",
 		"[mM][uU][lL][tT][iI][^%s%.%-_]*", "[mM][sS][uU][bB][sS]?", "[dD][uU][aA][lL]",
-		"[yY][uU][rR][aA][sS][uU][kK][aA]", "[tT][oO][oO][nN][sS][hH][uU][bB]",
+		"[yY][uU][rR][aA][sS][uU][kK][aA]", "[tT][oO][oO][nN][sS]?[hH][uU][bB]?",
 		"[0-9]+%-[bB][iI][tT]",
 		"[uU][nN][cC][eE][nN][sS][oO][rR][eE][dD]", "[cC][eE][nN][sS][oO][rR][eE][dD]",
 		"[bB][aA][tT][cC][hH]", "[rR][eE][pP][aA][cC][kK]", "[pP][rR][oO][pP][eE][rR]",
 		"[bB][dD][rR][iI][pP]?", "[bB][dD]", "[tT][vV]", "[wW][eE][bB]",
 		"[vV][pP]9", "[aA][vV]1", "[xX][vV][iI][dD]",
-		"[sS][pP][eE][cC][iI][aA][lL]", "[oO][vV][aA]", "[oO][nN][aA]", "[oO][aA][dD]"
+		"[sS][pP][eE][cC][iI][aA][lL]", "[oO][vV][aA]", "[oO][nN][aA]", "[oO][aA][dD]",
+		"[aA][mM][zZ][nN]", "[jJ][pP][nN]", "[dD][sS][nN][pP]", "[cC][rR]", "[fF][uU][nN][iI]",
+		"[aA][bB][eE][mM][aA]", "[wW][oO][wW][oO][wW]", "[bB][sS]%-?[0-9]*", "[aA][tT]%-?[xX]",
+		"[mM][xX]", "[tT][vV][kK]", "[tT][vV][oO]", "[aA][nN][yY][iI][vV]", "[hH][iI][dD][iI][vV][eE]",
+		"[pP][rR][iI][mM][eE]"
 	}
 
 	for _, tag in ipairs(tags) do
-		s = s:gsub("[%s%.%-_]" .. tag .. "[%s%.%-_]", " ")
-		s = s:gsub("[%s%.%-_]" .. tag .. "$", "")
-		s = s:gsub("^" .. tag .. "[%s%.%-_]", "")
+		-- Clean tags inside delimiters
+		s = s:gsub("[%s%.%-%_%[%(]" .. tag .. "[%s%.%-%_%]%)/]", " ")
+		s = s:gsub("[%s%.%-%_%[%(]" .. tag .. "$", "")
+		s = s:gsub("^" .. tag .. "[%s%.%-%_%]%)/]", "")
 	end
 
-	-- Strip season/episode/version tags based on patterns
-	for _, pattern in ipairs(TITLE_CLEAN_PATTERNS) do
-		if pattern ~= "%.%w+$" then
-			s = s:gsub(pattern, "")
-		end
+	-- Clean empty or punctuation brackets
+	for _ = 1, 3 do -- Recursive cleanup for nested or sequential brackets
+		s = s:gsub("%([%s%.%-_]*%)", "")
+		s = s:gsub("%[[%s%.%-_]*%]", "")
+		s = s:gsub("【[%s%.%-_]*】", "")
 	end
+
+	s = StringOps.trim(StringOps.normalize_spacing(s))
 
 	-- Strip version tags
-	s = s:gsub("[vV][0-9]+$", "")
-	s = s:gsub("[ _%-][Vv][0-9]+", "")
+	s = s:gsub("[%[%s%.%-_][vV][0-9]+[%]%s%.%-_]*$", "")
+	s = s:gsub("[%[%s%.%-_][Vv][0-9]+[%]%s%.%-_]*", " ")
 
-	-- Strip years (19xx, 20xx)
-	s = s:gsub("[%s%.%-_][12][0-9][0-9][0-9][%s%.%-_]", " ")
-	s = s:gsub("[%s%.%-_][12][0-9][0-9][0-9]$", "")
+	-- Strip release years
+	s = s:gsub("[%[%s%.%-_%(][12][0-9][0-9][0-9][%]%s%.%-_%)]", " ")
+	s = s:gsub("[%[%s%.%-_%(][12][0-9][0-9][0-9]$", "")
+
+	-- Strip standalone info
+	s = s:gsub("[%s%.%-_]%([Tt][Vv]%)", "")
+	s = s:gsub("[%s%.%-_]%([Mm][Oo][Vv][Ii][Ee]%)", "")
+	s = s:gsub("[%s%.%-_]%([Oo][Vv][Aa]%)", "")
+	s = s:gsub("[%s%.%-_]%([Oo][Nn][Aa]%)", "")
+
+	-- Clean empty brackets
+	for _ = 1, 2 do
+		s = s:gsub("%([%s%.%-_]*%)", "")
+		s = s:gsub("%[[%s%.%-_]*%]", "")
+		s = s:gsub("【[%s%.%-_]*】", " ")
+	end
+
+	-- Strip season, episode, and version tags
+	local cleaner_patterns = {
+		"[%.%s_]+[Ss]%d+[Ee]%d+",
+		"[%.%s_]+[Ee]%d+",
+		"[%.%s_]+[Ss]eason%s*%d+",
+		"[%.%s_]+%d+[a-z][a-z]%s+[Ss]eason",
+		"[%.%s_]+[Ss]%d+",
+		"[%.%s_%[%(]+[0-9]+[vV][0-9]+[%]%)%s%.%-_]*$",
+		"[%s%.%-%_]+[0-9]+$"
+	}
+
+	for _, pattern in ipairs(cleaner_patterns) do
+		s = StringOps.trim(s)
+		s = s:gsub(pattern, "")
+	end
 
 	-- Strip trailing punctuation and delimiters
 	s = s:gsub("[%s%-%:_%.]+$", "")
