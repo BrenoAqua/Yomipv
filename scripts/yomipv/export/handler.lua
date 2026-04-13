@@ -7,7 +7,6 @@ local StringOps = require("lib.string_ops")
 local Player = require("lib.player")
 local Counter = require("lib.counter")
 local Curl = require("lib.curl")
-local Platform = require("lib.platform")
 
 local Handler = {}
 
@@ -957,31 +956,13 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 			Player.notify("Persistent mode: " .. (enabled and "On" or "Off"), "info", 1)
 		end,
 		on_click_fallback = function()
-			if self.deps.history then
-				self.deps.history:handle_click()
-			end
 		end,
 		on_hover_fallback = function()
-			if self.deps.history then
-				self.deps.history:handle_mouse_move()
-			end
 		end,
 		on_lookup = function(data)
 			if self.last_selection then
-				mp.command_native_async({
-					name = "subprocess",
-					playback_only = false,
-					args = {
-						Platform.get_curl_cmd(),
-						"-s",
-						"-X",
-						"POST",
-						"--connect-timeout",
-						"1",
-						"http://127.0.0.1:19634/copy",
-					},
-				}, function() end)
-				return
+				self.last_selection = nil
+				Curl.post("http://127.0.0.1:19634/copy", "{}", function() end)
 			end
 			if self.pending_lookup_term == data.term and self.pending_lookup_reading == data.reading then
 				return
@@ -1013,19 +994,7 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		on_hide = function()
 			self.pending_lookup_term = nil
 			self.pending_lookup_reading = nil
-			mp.command_native_async({
-				name = "subprocess",
-				playback_only = false,
-				args = {
-					Platform.get_curl_cmd(),
-					"-s",
-					"-X",
-					"POST",
-					"--connect-timeout",
-					"1",
-					"http://127.0.0.1:19634/hide",
-				},
-			}, function() end)
+			Curl.post("http://127.0.0.1:19634/hide", "{}", function() end)
 		end,
 		word_colors = word_colors,
 		should_resume = not was_paused,

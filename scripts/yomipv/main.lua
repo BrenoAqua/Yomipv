@@ -89,6 +89,14 @@ mp.register_event("file-loaded", function()
 	yomitan:clear_cache()
 end)
 
+mp.observe_property("focused", "bool", function(_, is_focused)
+	if is_focused then
+		Curl.post("http://127.0.0.1:19634/app-focus?state=true", "{}", function() end)
+	else
+		Curl.post("http://127.0.0.1:19634/app-focus?state=false", "{}", function() end)
+	end
+end)
+
 mp.add_hook("on_pre_shutdown", 50, function()
 	Launcher.shutdown_lookup_app()
 end)

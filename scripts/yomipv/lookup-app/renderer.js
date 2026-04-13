@@ -324,7 +324,7 @@ const sendSelectedDict = (el) => {
     if (!link.style.cssText) link.removeAttribute('style');
   });
 
-  // Strip highlight class from the export HTML so Anki gets clean <b> tags
+  // Remove highlight class for clean bold tags in Anki export
   exportEl.querySelectorAll('.highlight').forEach(el => {
     el.removeAttribute('class');
   });
@@ -346,7 +346,7 @@ const sendSelectedDict = (el) => {
 
   const dictionaryHtml = exportEl.outerHTML;
 
-  // Each dictionary's <style> block selectors reference its own name, so a text match is sufficient
+  // Dictionary style selectors use distinct names, allowing simple text matching
   let styleHtml = '';
   glossaryEl.querySelectorAll('style').forEach(styleEl => {
     const css = styleEl.textContent.trim();
@@ -368,7 +368,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
   isPerformingLookup = true;
 
-  // Abort any pending lookup fetch
+  // Abort pending lookup fetch
   if (currentAbortController) {
     currentAbortController.abort();
   }
@@ -392,7 +392,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
     return;
   }
 
-  // Save current term to history if not going back
+  // Store current term in history
   if (!isBack && currentTerm && currentTerm !== term) {
     lookupHistory.push({
       term: currentTerm,
@@ -408,22 +408,27 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
   currentPrioritizeKanjiMatch = prioritizeKanjiMatch !== undefined ? prioritizeKanjiMatch : false;
   currentPrioritizeHiraganaMatch = prioritizeHiraganaMatch !== undefined ? prioritizeHiraganaMatch : false;
 
-  // Show transition screen only for non-subword transitions
+  // Transition screen logic for non-subword lookups
   if (!isSubword) {
     allEntries = [];
     currentEntryIndex = 0;
     
-    // Hide the container to prevent seeing old content
-    container.classList.add('no-transition');
-    container.classList.remove('visible');
+    // Trigger fade-out if currently visible
+    if (isVisible) {
+      container.classList.remove('visible');
+      // Delay to allow partial fade before content swap
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } else {
+      container.classList.add('no-transition');
+      container.classList.remove('visible');
+      void container.offsetHeight;
+    }
     
     headerEl.innerHTML = '';
     glossaryEl.innerHTML = '';
     entryPrev.style.display = 'none';
     entryNext.style.display = 'none';
     entryCounter.style.display = 'none';
-
-    void container.offsetHeight;
 
     ipcRenderer.send('show-window');
     isWindowVisible = true;
@@ -688,12 +693,22 @@ ipcRenderer.on('lookup-term', async (event, data) => {
   performLookup(data.term, data.showFrequencies, data.showPitchAccents, false, data.prioritizeKanjiMatch, data.prioritizeHiraganaMatch);
 });
 
-ipcRenderer.on('copy-selection', () => {
+const handleCopy = () => {
   const selection = window.getSelection().toString();
   if (selection) {
     require('electron').clipboard.writeText(selection);
+    window.getSelection().removeAllRanges();
   }
   clearSelection();
+};
+
+document.addEventListener('copy', (e) => {
+  handleCopy();
+  e.preventDefault();
+});
+
+ipcRenderer.on('copy-selection', () => {
+  handleCopy();
 });
 
 document.body.addEventListener('contextmenu', (e) => {
@@ -766,7 +781,6 @@ ipcRenderer.on('window-hide-request', () => {
   
   isWindowVisible = false;
   const container = document.getElementById('lookup-container');
-  container.classList.add('no-transition');
   container.classList.remove('visible');
   headerEl.innerHTML = '';
   glossaryEl.innerHTML = '';
@@ -775,6 +789,28 @@ ipcRenderer.on('window-hide-request', () => {
   
   requestAnimationFrame(() => {
     ipcRenderer.send('window-hide-confirmed');
+  });
+});
+
+ipcRenderer.on('window-suspend-request', () => {
+  const container = document.getElementById('lookup-container');
+  container.classList.remove('visible');
+  requestAnimationFrame(() => {
+    ipcRenderer.send('window-suspend-confirmed');
+  });
+});
+
+ipcRenderer.on('window-resume-request', () => {
+  const container = document.getElementById('lookup-container');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      container.classList.remove('no-transition');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          container.classList.add('visible');
+        });
+      });
+    });
   });
 });
 
