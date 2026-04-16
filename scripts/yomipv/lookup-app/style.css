@@ -93,6 +93,29 @@ body {
   height: 100%;
 }
 
+#scroll-content::-webkit-scrollbar {
+  width: 6px;
+}
+#scroll-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+#scroll-content::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.4);
+  border-radius: 4px;
+}
+#scroll-content::-webkit-scrollbar-button {
+  display: block;
+  height: 6px;
+  background-color: transparent;
+}
+
+#scroll-content::-webkit-scrollbar-button:vertical:start:decrement,
+#scroll-content::-webkit-scrollbar-button:vertical:end:increment {
+  display: block;
+  height: 6px;
+  background-color: transparent;
+}
+
 #term-header {
   margin-bottom: 12px;
   line-height: 1.1;

@@ -4,8 +4,37 @@ const http = require('http');
 const net = require('net');
 
 let mainWindow;
+let historyWindow = null;
 let pendingHide = false;
+let historyHideTimeout = null;
 let lastSelectedDictHtml = '';
+
+let lookupSuspended = false;
+let lookupSuspendTimeout = null;
+
+let isContextMenuOpen = false;
+let appIsFocused = true;
+
+// Verify lookup window inspector or detached tools state
+function isMainDevToolsOpen() {
+  const isDevToolsAlive = typeof devToolsWin !== 'undefined' && devToolsWin && !devToolsWin.isDestroyed();
+  return isDevToolsAlive || (mainWindow && mainWindow.webContents.isDevToolsOpened());
+}
+
+// Verify history panel internal inspector state
+function isHistoryDevToolsOpen() {
+  return !!(historyWindow && historyWindow.webContents.isDevToolsOpened());
+}
+
+// Sends JSON command to mpv IPC pipe
+function sendMpvMessage(message, ...args) {
+  if (mpvIpc) {
+    const cmd = { command: [message, ...args] };
+    mpvIpc.write(JSON.stringify(cmd) + '\n');
+  } else {
+    console.warn(`[IPC] Cannot send ${message}: mpvIpc not connected`);
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -38,7 +67,41 @@ function createWindow() {
   });
 }
 
-// mpv IPC setup
+function createHistoryWindow() {
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  const historyWidth = 420;
+  
+  historyWindow = new BrowserWindow({
+    width: historyWidth,
+    height: height,
+    x: width - historyWidth,
+    y: 0,
+    frame: false,
+    transparent: true,
+    show: false,
+    skipTaskbar: true,
+    focusable: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    alwaysOnTop: true,
+    type: 'toolbar',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  historyWindow.setIgnoreMouseEvents(true, { forward: true });
+
+  historyWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+  historyWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  historyWindow.loadFile('history.html');
+}
+
+// mpv IPC pipe path from CLI argument
 const ipcPipeArg = process.argv.find(arg => arg.startsWith('--ipc-pipe='));
 const ipcPipe = ipcPipeArg ? ipcPipeArg.split('=')[1] : null;
 
@@ -64,8 +127,9 @@ if (ipcPipe) {
 
 app.whenReady().then(() => {
   createWindow();
+  createHistoryWindow();
 
-  // Simple HTTP server to receive terms from MPV
+  // HTTP server for terms and commands from mpv Lua
   const server = http.createServer((req, res) => {
     console.log(`[IPC] Request: ${req.method} ${req.url}`);
     
@@ -103,16 +167,113 @@ app.whenReady().then(() => {
           if (mainWindow) {
             mainWindow.webContents.send('copy-selection');
           }
+          if (historyWindow) {
+            historyWindow.webContents.send('copy-selection');
+          }
           return;
         }
 
         if (req.url === '/hide') {
           console.log('[IPC] Hide signal received, requesting renderer clear');
           res.end('hiding');
+          
+          if (isMainDevToolsOpen()) return;
+          
           if (mainWindow) {
             pendingHide = true;
             mainWindow.webContents.send('window-hide-request');
           }
+          return;
+        }
+
+        if (req.url === '/history-show') {
+          console.log('[IPC] History show signal received');
+          res.end('ok');
+          if (historyHideTimeout) {
+            clearTimeout(historyHideTimeout);
+            historyHideTimeout = null;
+          }
+          if (historyWindow) {
+            historyWindow.showInactive();
+            historyWindow.webContents.send('show-history');
+          }
+          return;
+        }
+
+        if (req.url === '/history-hide') {
+          console.log('[IPC] History hide signal received');
+          res.end('ok');
+          
+          if (isHistoryDevToolsOpen()) return;
+
+          if (historyHideTimeout) {
+            clearTimeout(historyHideTimeout);
+          }
+          if (historyWindow) {
+            historyWindow.webContents.send('hide-history');
+            historyHideTimeout = setTimeout(() => {
+              if (historyWindow && !historyWindow.isDestroyed()) {
+                historyWindow.hide();
+              }
+              historyHideTimeout = null;
+            }, 450);
+          }
+          return;
+        }
+
+        if (req.url === '/history') {
+          console.log('[IPC] History payload received');
+          try {
+            const data = JSON.parse(body);
+            if (historyWindow && data.config && data.config.history_width) {
+              const [w, h] = historyWindow.getSize();
+              const [x, y] = historyWindow.getPosition();
+              const newW = parseInt(data.config.history_width) + 40; // Padding for shadow
+              if (w !== newW) {
+                const { screen } = require('electron');
+                const primaryDisplay = screen.getPrimaryDisplay();
+                const { width: screenWidth } = primaryDisplay.workAreaSize;
+                historyWindow.setBounds({
+                  x: screenWidth - newW,
+                  y: y,
+                  width: newW,
+                  height: h
+                });
+              }
+            }
+            if (historyWindow) {
+              historyWindow.webContents.send('update-history', data);
+            }
+          } catch (e) {
+            console.error('Failed to parse history body', e);
+          }
+          res.end('ok');
+          return;
+        }
+
+        if (req.url.startsWith('/app-focus')) {
+          const stateStr = new URL(req.url, 'http://localhost').searchParams.get('state');
+          appIsFocused = stateStr === 'true';
+          
+          if (stateStr === 'false') {
+            if (!isMainDevToolsOpen() && !isContextMenuOpen && mainWindow && mainWindow.isVisible() && !pendingHide) {
+              lookupSuspended = true;
+              mainWindow.webContents.send('window-suspend-request');
+            }
+          } else if (stateStr === 'true') {
+            if (lookupSuspended && mainWindow) {
+              lookupSuspended = false;
+              if (lookupSuspendTimeout) {
+                clearTimeout(lookupSuspendTimeout);
+                lookupSuspendTimeout = null;
+              }
+              if (!mainWindow.isVisible()) {
+                mainWindow.showInactive();
+              }
+              mainWindow.webContents.send('window-resume-request');
+            }
+          }
+          res.end('ok');
           return;
         }
 
@@ -146,7 +307,7 @@ app.whenReady().then(() => {
     console.log('Lookup IPC server listening on 19634');
   });
 
-  // Parent PID monitoring
+  // Monitor parent PID
   const parentPidArg = process.argv.find(arg => arg.startsWith('--parent-pid='));
   const parentPid = parentPidArg ? parseInt(parentPidArg.split('=')[1]) : null;
 
@@ -256,6 +417,19 @@ function openInspector() {
   mainWindow.webContents.setDevToolsWebContents(devToolsWin.webContents);
   mainWindow.webContents.openDevTools({ mode: 'detach' });
 
+  // Restore lookup window visibility if suspended before opening inspector
+  if (lookupSuspended && mainWindow) {
+    lookupSuspended = false;
+    if (lookupSuspendTimeout) {
+      clearTimeout(lookupSuspendTimeout);
+      lookupSuspendTimeout = null;
+    }
+    if (!mainWindow.isVisible()) {
+      mainWindow.showInactive();
+    }
+    mainWindow.webContents.send('window-resume-request');
+  }
+
   devToolsWin.webContents.once('dom-ready', () => {
     devToolsWin.webContents.executeJavaScript(
       "UI.inspectorView.showPanel('elements')"
@@ -278,6 +452,13 @@ function openInspector() {
       mainWindow.setMovable(false);
       mainWindow.setFocusable(false);
       mainWindow.webContents.send('inspector-mode', false);
+    }
+
+    if (!appIsFocused) {
+      if (mainWindow && mainWindow.isVisible() && !pendingHide && !lookupSuspended) {
+        lookupSuspended = true;
+        mainWindow.webContents.send('window-suspend-request');
+      }
     }
   };
 
@@ -303,16 +484,17 @@ ipcMain.on('open-inspector', () => {
 });
 
 ipcMain.on('show-context-menu', (event, hasSelection) => {
-  const template = [
-    {
-      label: 'Copy',
-      enabled: hasSelection,
-      click: () => {
-        if (mainWindow) {
-          mainWindow.webContents.send('copy-selection');
-        }
-      }
-    },
+  const isHistory = historyWindow && event.sender === historyWindow.webContents;
+  const copyItem = {
+    label: 'Copy',
+    enabled: hasSelection,
+    click: () => {
+      event.sender.send('copy-selection');
+    }
+  };
+
+  const template = isHistory ? [copyItem] : [
+    copyItem,
     { type: 'separator' },
     {
       label: 'Inspect Element',
@@ -323,43 +505,34 @@ ipcMain.on('show-context-menu', (event, hasSelection) => {
     {
       label: 'Refresh CSS',
       click: () => {
-        if (mainWindow) {
-          mainWindow.webContents.send('refresh-css');
-        }
+        event.sender.send('refresh-css');
       }
     }
   ];
   const menu = Menu.buildFromTemplate(template);
+  
+  menu.on('menu-will-show', () => { isContextMenuOpen = true; });
+  menu.on('menu-will-close', () => { 
+    setTimeout(() => { isContextMenuOpen = false; }, 300);
+  });
+  
   menu.popup(BrowserWindow.fromWebContents(event.sender));
 });
 
 ipcMain.on('sync-selection', (event, text) => {
   console.log('[IPC] sync-selection received:', text);
-  if (mpvIpc) {
-    const cmd = { command: ['script-message', 'yomipv-sync-selection', text] };
-    mpvIpc.write(JSON.stringify(cmd) + '\n');
-  } else {
-    console.warn('[IPC] Cannot sync selection: mpvIpc not connected');
-  }
+  sendMpvMessage('script-message', 'yomipv-sync-selection', text);
 });
 
 ipcMain.on('dictionary-selected', (event, content) => {
   console.log('[IPC] dictionary-selected received');
-  
   lastSelectedDictHtml = content;
-
-  if (mpvIpc) {
-    const cmd = { command: ['script-message', 'yomipv-dictionary-selected', 'HTTP_FETCH'] };
-    mpvIpc.write(JSON.stringify(cmd) + '\n');
-  } else {
-    console.warn('[IPC] Cannot send dictionary selection: mpvIpc not connected');
-  }
+  sendMpvMessage('script-message', 'yomipv-dictionary-selected', 'HTTP_FETCH');
 });
 
 ipcMain.on('active-entry', (event, data) => {
-  if (mpvIpc && data) {
-    const cmd = { command: ['script-message', 'yomipv-active-entry', data.expression || '', data.reading || ''] };
-    mpvIpc.write(JSON.stringify(cmd) + '\n');
+  if (data) {
+    sendMpvMessage('script-message', 'yomipv-active-entry', data.expression || '', data.reading || '');
   }
 });
 
@@ -377,9 +550,48 @@ ipcMain.on('show-window', () => {
 ipcMain.on('window-hide-confirmed', () => {
   if (mainWindow && pendingHide) {
     console.log('[IPC] Hide confirmed by renderer, hiding window');
-    mainWindow.hide();
-    pendingHide = false;
+    // Defer hiding to ensure frame synchronization and prevent flicker
+    setTimeout(() => {
+      if (mainWindow && pendingHide && !mainWindow.isDestroyed()) {
+        mainWindow.hide();
+        pendingHide = false;
+      }
+    }, 450);
   } else {
     console.log('[IPC] Hide confirmed but ignored (new lookup pending)');
+  }
+});
+
+ipcMain.on('window-suspend-confirmed', () => {
+  if (mainWindow && lookupSuspended) {
+    lookupSuspendTimeout = setTimeout(() => {
+      if (mainWindow && lookupSuspended && !mainWindow.isDestroyed()) {
+        mainWindow.hide();
+      }
+      lookupSuspendTimeout = null;
+    }, 450);
+  }
+});
+
+// History IPC Actions to pass down to MPV
+ipcMain.on('history-jump', (event, time) => {
+  sendMpvMessage('script-message', 'yomipv-history-jump', time.toString());
+});
+
+ipcMain.on('history-expand', (event, entry) => {
+  sendMpvMessage('script-message', 'yomipv-history-expand', JSON.stringify(entry));
+});
+
+ipcMain.on('history-clear', () => {
+  sendMpvMessage('script-message', 'yomipv-history-clear');
+});
+
+ipcMain.on('history-toggle-anim', () => {
+  sendMpvMessage('script-message', 'yomipv-history-toggle-anim');
+});
+
+ipcMain.on('history-set-ignore-mouse', (event, ignore) => {
+  if (historyWindow) {
+    historyWindow.setIgnoreMouseEvents(ignore, { forward: true });
   }
 });

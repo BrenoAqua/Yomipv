@@ -208,10 +208,26 @@ function Display.fix_color(c, default)
 		return default or "FFFFFF"
 	end
 	local s = tostring(c):gsub("[%#%']", ""):gsub("^0x", "")
+
+	-- Handle rgb(r, g, b) and rgba(r, g, b, a)
+	local r, g, b = s:match("rgb%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%)")
+	if not r then
+		r, g, b = s:match("rgba%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*,%s*[%d%.]+%s*%)")
+	end
+
+	if r and g and b then
+		return string.format(
+			"%02X%02X%02X",
+			math.min(255, math.max(0, tonumber(b))),
+			math.min(255, math.max(0, tonumber(g))),
+			math.min(255, math.max(0, tonumber(r)))
+		)
+	end
+
 	local hex = s:match("%x%x%x%x%x%x")
 	if hex then
-		local r, g, b = hex:sub(1, 2), hex:sub(3, 4), hex:sub(5, 6)
-		return b .. g .. r
+		local rh, gh, bh = hex:sub(1, 2), hex:sub(3, 4), hex:sub(5, 6)
+		return bh .. gh .. rh
 	end
 	return default or "FFFFFF"
 end

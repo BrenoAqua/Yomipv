@@ -1,25 +1,20 @@
---[[ Subtitle history panel                                              ]]
---[[ Side-panel display and interaction management for subtitle history. ]]
+--[[ Subtitle history panel                             ]]
+--[[ History data management and Electron frontend sync ]]
 
 local mp = require("mp")
 local msg = require("mp.msg")
-local Display = require("lib.display")
-local StringOps = require("lib.string_ops")
+local utils = require("mp.utils")
 local Monitor = require("capture.monitor")
 local Player = require("lib.player")
-local Renderer = require("interface.history.renderer")
+local StringOps = require("lib.string_ops")
+local Curl = require("lib.curl")
 
 local History = {
 	active = false,
 	keybindings = {},
-	hit_boxes = {},
-	hovered_id = nil,
-	scroll_top_index = 1,
-	auto_scroll = true,
-	last_entries_count = 0,
-	overlay = mp.create_osd_overlay and mp.create_osd_overlay("ass-events"),
 	config = nil,
 	exporter_handler = nil,
+	_registered_hooks = false
 }
 
 function History:new(o)
@@ -31,6 +26,15 @@ end
 
 function History:init(config)
 	self.config = config
+	mp.observe_property("focused", "bool", function(_, is_focused)
+		if self.active then
+			if is_focused then
+				Curl.post("http://127.0.0.1:19634/history-show", "{}", function() end)
+			else
+				Curl.post("http://127.0.0.1:19634/history-hide", "{}", function() end)
+			end
+		end
+	end)
 end
 
 function History:set_exporter_handler(handler)
@@ -48,94 +52,109 @@ function History:wrap_handler(callback, ...)
 	end
 end
 
-function History:make_osd()
-	local osd = Display:new()
-	local ow, oh = mp.get_osd_size()
-	if oh == 0 then
-		return osd
-	end
-	local scale = oh / 720
-
-	Renderer.draw(self, osd, scale, ow, oh)
-	return osd
-end
-
-function History:handle_mouse_move()
-	local mx, my = mp.get_mouse_pos()
-	local old_hovered = self.hovered_id
-	self.hovered_id = nil
-	for _, box in ipairs(self.hit_boxes) do
-		if mx >= box.x1 and mx <= box.x2 and my >= box.y1 and my <= box.y2 then
-			self.hovered_id = box.id
-			break
-		end
-	end
-	if old_hovered ~= self.hovered_id then
-		self:update()
-	end
-end
-
-function History:handle_click()
-	local mx, my = mp.get_mouse_pos()
-	for _, box in ipairs(self.hit_boxes) do
-		if mx >= box.x1 and mx <= box.x2 and my >= box.y1 and my <= box.y2 then
-			if box.id == "clear" then
-				self:clear_history()
-				return true
-			end
-			if box.id == "toggle_anim" then
-				self.config.picture_animated = not self.config.picture_animated
-				self.config.save("picture_animated", self.config.picture_animated)
-				local status = self.config.picture_animated and "Enabled" or "Disabled"
-				Player.notify("Animated pictures: " .. status, "info")
-				self:update(true)
-				return true
-			end
-			if box.entry then
-				if self.exporter_handler and self.exporter_handler.expand_to_subtitle then
-					self.exporter_handler:expand_to_subtitle(box.entry)
-				elseif box.entry.start and box.entry.start >= 0 then
-					mp.set_property_number("time-pos", box.entry.start + 0.035)
-					Player.notify("Jumped to " .. StringOps.format_duration(box.entry.start, true))
-				end
-				return true
-			end
-		end
-	end
-	return false
-end
-
 function History:clear_history()
 	Monitor.clear_history()
 	Player.notify("History cleared", "info", 2)
-	self:update(true)
+	self:update()
 end
 
 function History:update(force)
 	if self.active == false then
 		return
 	end
-	local ow, oh = mp.get_osd_size()
-	local entries_key = Monitor.is_appending() and ("appending_" .. #Monitor.recorded_subs())
-		or ("history_" .. #Monitor.get_history())
-	local current_state =
-		string.format("%d_%d_%s_%s_%s", ow, oh, tostring(self.hovered_id), entries_key, tostring(self.scroll_top_index))
-	-- Force update during auto-scroll for immediate visibility
-	if not force and not self.auto_scroll and self.last_state == current_state then
+
+	-- Extract state for web view
+	local entries = Monitor.is_appending() and Monitor.recorded_subs() or Monitor.get_history()
+
+	local current_count = #entries
+	local current_can_expand = (self.exporter_handler
+		and self.exporter_handler.expand_to_subtitle ~= nil) and true or false
+	local current_sig = ""
+	for i = math.max(1, current_count - 5), current_count do
+		local e = entries[i]
+		if e then current_sig = current_sig .. (e.primary_sid or "") .. (e.secondary_sid or "") end
+	end
+	if not force
+		and self._last_count == current_count
+		and self._last_appending == Monitor.is_appending()
+		and self._last_can_expand == current_can_expand
+		and self._last_sig == current_sig
+	then
 		return
 	end
-	self.overlay.res_x = ow
-	self.overlay.res_y = oh
-	self.overlay.data = self:make_osd():get_text()
-	self.overlay:update()
-	self.last_state = current_state
+	self._last_count = current_count
+	self._last_appending = Monitor.is_appending()
+	self._last_can_expand = current_can_expand
+	self._last_sig = current_sig
+
+	-- Pass config fields for rendering
+	local safe_config = {}
+	if (self.config) then
+		safe_config.picture_animated = self.config.picture_animated
+		safe_config.history_accent_color = self.config.history_accent_color
+		safe_config.history_show_secondary = self.config.history_show_secondary
+		safe_config.history_width = self.config.history_width
+		safe_config.history_max_height = self.config.history_max_height
+		safe_config.history_background_opacity = self.config.history_background_opacity
+		safe_config.history_font_size = self.config.history_font_size
+		safe_config.history_secondary_font_size = self.config.history_secondary_font_size
+		safe_config.history_font_family = self.config.history_font_family
+		safe_config.history_border_radius = self.config.history_border_radius
+		safe_config.history_header_background_color = self.config.history_header_background_color
+	end
+
+	local payload = {
+		is_appending = Monitor.is_appending(),
+		can_expand = current_can_expand,
+		entries = entries,
+		config = safe_config
+	}
+
+	local payload_json = utils.format_json(payload)
+
+	Curl.post("http://127.0.0.1:19634/history", payload_json, function() end)
+end
+
+function History:_register_ipc_hooks()
+	if self._registered_hooks then return end
+	self._registered_hooks = true
+
+	mp.register_script_message("yomipv-history-jump", function(time_str)
+		local time = tonumber(time_str)
+		if time and time >= 0 then
+			local current_delay = mp.get_property_number("sub-delay") or 0
+			local jump_time = time + current_delay + 0.035
+			mp.set_property_number("time-pos", jump_time)
+			Player.notify("Jumped to " .. StringOps.format_duration(jump_time, true))
+		end
+	end)
+
+	mp.register_script_message("yomipv-history-expand", function(entry_json)
+		if self.exporter_handler and self.exporter_handler.expand_to_subtitle then
+			local entry = utils.parse_json(entry_json)
+			if entry then
+				self.exporter_handler:expand_to_subtitle(entry)
+			end
+		end
+	end)
+
+	mp.register_script_message("yomipv-history-clear", function()
+		self:clear_history()
+	end)
+
+	mp.register_script_message("yomipv-history-toggle-anim", function()
+		if self.config then
+			self.config.picture_animated = not self.config.picture_animated
+			self.config.save("picture_animated", self.config.picture_animated)
+			local status = self.config.picture_animated and "Enabled" or "Disabled"
+			Player.notify("Animated pictures: " .. status, "info")
+			self:update(true)
+		end
+	end)
 end
 
 function History:open(request_state)
-	if self.overlay == nil then
-		Player.notify("OSD overlay is not supported", "error", 5)
-		return
-	end
+	self:_register_ipc_hooks()
 
 	if self.active == true and request_state ~= "open" then
 		self:close()
@@ -151,36 +170,21 @@ function History:open(request_state)
 		mp.add_forced_key_binding(val.key, val.key, val.fn)
 	end
 
-	mp.add_forced_key_binding("MBTN_LEFT", "menu-hit-test", function()
-		self:handle_click()
-	end)
-	mp.add_forced_key_binding("mouse_move", "menu-hover-test", function()
-		self:handle_mouse_move()
-	end)
-	mp.add_forced_key_binding("WHEEL_UP", "menu-scroll-up", function()
-		self.scroll_top_index = math.max(1, (self.scroll_top_index or 1) - 1)
-		self.auto_scroll = false
-		self:update()
-	end)
-	mp.add_forced_key_binding("WHEEL_DOWN", "menu-scroll-down", function()
-		local max_idx = self.max_scroll_top_index or 1
-		self.scroll_top_index = math.min(max_idx, (self.scroll_top_index or 1) + 1)
-		self.auto_scroll = (self.scroll_top_index == max_idx)
-		self:update()
-	end)
 	mp.add_forced_key_binding(self.config.key_history_clear, "menu-clear-history", function()
 		self:clear_history()
 	end)
 
-	self.auto_scroll = true
-	self.scroll_top_index = self.scroll_top_index or 1
-	self.last_state = nil
+	mp.add_forced_key_binding("ctrl+c", "menu-copy", function()
+		Curl.post("http://127.0.0.1:19634/copy", "{}", function() end)
+	end)
+
 	self.active = true
 
-	-- Update in real-time when adding subtitles
+	Curl.post("http://127.0.0.1:19634/history-show", "{}", function() end)
+
 	self._sub_observer = function()
 		if self.active then
-			-- Small delay ensures Monitor processed update
+			self:update()
 			mp.add_timeout(0.05, function()
 				if self.active then
 					self:update()
@@ -190,8 +194,7 @@ function History:open(request_state)
 	end
 	mp.observe_property("sub-text", "string", self._sub_observer)
 
-	-- Periodic update timer to ensure display refresh without subtitle changes
-	self._update_timer = mp.add_periodic_timer(0.1, function()
+	self._update_timer = mp.add_periodic_timer(0.05, function()
 		if self.active then
 			self:update()
 		end
@@ -211,11 +214,8 @@ function History:close()
 	for _, val in pairs(self.keybindings) do
 		mp.remove_key_binding(val.key)
 	end
-	mp.remove_key_binding("menu-hit-test")
-	mp.remove_key_binding("menu-hover-test")
-	mp.remove_key_binding("menu-scroll-up")
-	mp.remove_key_binding("menu-scroll-down")
 	mp.remove_key_binding("menu-clear-history")
+	mp.remove_key_binding("menu-copy")
 	if self._sub_observer then
 		mp.unobserve_property(self._sub_observer)
 		self._sub_observer = nil
@@ -224,8 +224,9 @@ function History:close()
 		self._update_timer:kill()
 		self._update_timer = nil
 	end
-	self.hovered_id = nil
-	self.overlay:remove()
+
+	Curl.post("http://127.0.0.1:19634/history-hide", "{}", function() end)
+
 	self.active = false
 
 	if self.config and self.config.history_hide_volume then
