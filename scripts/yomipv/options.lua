@@ -223,17 +223,20 @@ local default_options = {
 	history_max_entries = 200, -- Maximum subtitle entries to retain (0 to disable limit)
 
 	-- Size
-	history_width = 220, -- History panel width
-	history_max_height = 400, -- History panel maximum height
+	history_width = 380,
+	history_max_height = "60vh",
 
 	-- Typography
-	history_font_size = 15,
-	history_secondary_font_size = 12,
+	history_font_size = 16,
+	history_secondary_font_size = 13,
+	history_font_family = "", -- Comma-separated fonts
 
 	-- Appearance
-	history_accent_color = "#3db54a", -- Header and scrollbar accent color
+	history_accent_color = "#3db54a", -- Subtitle hover highlight color
+	history_header_background_color = "rgba(255, 255, 255, 0.03)",
 	history_background_color = "#111111",
-	history_background_opacity = "13%",
+	history_background_opacity = "86%",
+	history_border_radius = 8,
 
 	-- Keybindings
 	key_toggle_history = "a",

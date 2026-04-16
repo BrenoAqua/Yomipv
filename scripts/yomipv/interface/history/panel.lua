@@ -63,7 +63,7 @@ function History:update(force)
 		return
 	end
 
-	-- Extract state to push to the web view
+	-- Extract state for web view
 	local entries = Monitor.is_appending() and Monitor.recorded_subs() or Monitor.get_history()
 
 	local current_count = #entries
@@ -87,12 +87,20 @@ function History:update(force)
 	self._last_can_expand = current_can_expand
 	self._last_sig = current_sig
 
-	-- Pass only the config fields needed for rendering
+	-- Pass config fields for rendering
 	local safe_config = {}
-	if self.config then
+	if (self.config) then
 		safe_config.picture_animated = self.config.picture_animated
 		safe_config.history_accent_color = self.config.history_accent_color
 		safe_config.history_show_secondary = self.config.history_show_secondary
+		safe_config.history_width = self.config.history_width
+		safe_config.history_max_height = self.config.history_max_height
+		safe_config.history_background_opacity = self.config.history_background_opacity
+		safe_config.history_font_size = self.config.history_font_size
+		safe_config.history_secondary_font_size = self.config.history_secondary_font_size
+		safe_config.history_font_family = self.config.history_font_family
+		safe_config.history_border_radius = self.config.history_border_radius
+		safe_config.history_header_background_color = self.config.history_header_background_color
 	end
 
 	local payload = {
@@ -115,8 +123,9 @@ function History:_register_ipc_hooks()
 		local time = tonumber(time_str)
 		if time and time >= 0 then
 			local current_delay = mp.get_property_number("sub-delay") or 0
-			mp.set_property_number("time-pos", time + current_delay)
-			Player.notify("Jumped to " .. StringOps.format_duration(time + current_delay, true))
+			local jump_time = time + current_delay + 0.035
+			mp.set_property_number("time-pos", jump_time)
+			Player.notify("Jumped to " .. StringOps.format_duration(jump_time, true))
 		end
 	end)
 

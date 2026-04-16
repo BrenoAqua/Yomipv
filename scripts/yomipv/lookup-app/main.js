@@ -26,7 +26,7 @@ function isHistoryDevToolsOpen() {
   return !!(historyWindow && historyWindow.webContents.isDevToolsOpened());
 }
 
-// Dispatch JSON-formatted command to mpv IPC pipe
+// Sends JSON command to mpv IPC pipe
 function sendMpvMessage(message, ...args) {
   if (mpvIpc) {
     const cmd = { command: [message, ...args] };
@@ -101,7 +101,7 @@ function createHistoryWindow() {
   historyWindow.loadFile('history.html');
 }
 
-// mpv IPC pipe path passed as CLI arg
+// mpv IPC pipe path from CLI argument
 const ipcPipeArg = process.argv.find(arg => arg.startsWith('--ipc-pipe='));
 const ipcPipe = ipcPipeArg ? ipcPipeArg.split('=')[1] : null;
 
@@ -129,7 +129,7 @@ app.whenReady().then(() => {
   createWindow();
   createHistoryWindow();
 
-  // HTTP server for receiving terms and commands from mpv Lua
+  // HTTP server for terms and commands from mpv Lua
   const server = http.createServer((req, res) => {
     console.log(`[IPC] Request: ${req.method} ${req.url}`);
     
@@ -225,6 +225,22 @@ app.whenReady().then(() => {
           console.log('[IPC] History payload received');
           try {
             const data = JSON.parse(body);
+            if (historyWindow && data.config && data.config.history_width) {
+              const [w, h] = historyWindow.getSize();
+              const [x, y] = historyWindow.getPosition();
+              const newW = parseInt(data.config.history_width) + 40; // Padding for shadow
+              if (w !== newW) {
+                const { screen } = require('electron');
+                const primaryDisplay = screen.getPrimaryDisplay();
+                const { width: screenWidth } = primaryDisplay.workAreaSize;
+                historyWindow.setBounds({
+                  x: screenWidth - newW,
+                  y: y,
+                  width: newW,
+                  height: h
+                });
+              }
+            }
             if (historyWindow) {
               historyWindow.webContents.send('update-history', data);
             }
@@ -291,7 +307,7 @@ app.whenReady().then(() => {
     console.log('Lookup IPC server listening on 19634');
   });
 
-  // Parent PID monitoring
+  // Monitor parent PID
   const parentPidArg = process.argv.find(arg => arg.startsWith('--parent-pid='));
   const parentPid = parentPidArg ? parseInt(parentPidArg.split('=')[1]) : null;
 
@@ -401,7 +417,7 @@ function openInspector() {
   mainWindow.webContents.setDevToolsWebContents(devToolsWin.webContents);
   mainWindow.webContents.openDevTools({ mode: 'detach' });
 
-  // Restore lookup window visibility if suspended prior to opening inspector
+  // Restore lookup window visibility if suspended before opening inspector
   if (lookupSuspended && mainWindow) {
     lookupSuspended = false;
     if (lookupSuspendTimeout) {
@@ -535,7 +551,7 @@ ipcMain.on('show-window', () => {
 ipcMain.on('window-hide-confirmed', () => {
   if (mainWindow && pendingHide) {
     console.log('[IPC] Hide confirmed by renderer, hiding window');
-    // Defer window hiding to ensure final frame synchronization and prevent flickers
+    // Defer hiding to ensure frame synchronization and prevent flicker
     setTimeout(() => {
       if (mainWindow && pendingHide && !mainWindow.isDestroyed()) {
         mainWindow.hide();

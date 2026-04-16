@@ -20,7 +20,7 @@ const clearSelection = () => {
   });
   ipcRenderer.send('sync-selection', '');
 
-  // If a dictionary was selected, refresh its state in MPV without the highlights
+  // Refresh dictionary state without highlights
   const selectedTitle = glossaryEl.querySelector('[data-dictionary] > .selected');
   const targetDict = selectedTitle?.parentElement;
   if (targetDict) {
@@ -59,7 +59,7 @@ let currentShowPitchAccents = true;
 const renderHeader = (term, reading, frequencies) => {
   const cleanTerm = (term || '').trim();
 
-  // Wrap each character in a clickable span
+  // Wrap characters in clickable spans
   const wrapChars = (text, startIndex = 0) => {
     return Array.from(text).map((char, i) => 
       `<span class="header-char" data-index="${startIndex + i}">${char}</span>`
@@ -94,7 +94,7 @@ const renderHeader = (term, reading, frequencies) => {
     ${freqHtml ? `<div class="header-frequencies">${freqHtml}</div>` : ''}
   `;
 
-  // Attach click listeners to characters
+  // Attach click listeners to header characters
   headerEl.querySelectorAll('.header-char').forEach(el => {
     el.onclick = (e) => {
       e.stopPropagation();
@@ -108,7 +108,7 @@ const renderHeader = (term, reading, frequencies) => {
     };
   });
 
-  // Go back to previous term on right click
+  // Back to previous term on right click
   headerEl.oncontextmenu = (e) => {
     e.preventDefault();
     if (lookupHistory.length > 0) {
@@ -310,21 +310,21 @@ const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents) => {
 const sendSelectedDict = (el) => {
   const dictName = el.getAttribute('data-dictionary');
   
-  // Clone for export and revert image sources to original filenames
+  // Restore image sources in export clone
   const exportEl = el.cloneNode(true);
   exportEl.querySelectorAll('img[data-anki-src]').forEach(img => {
     img.src = img.getAttribute('data-anki-src');
     img.removeAttribute('data-anki-src');
   });
 
-  // Remove inline style properties injected by the lookup UI
+  // Remove transient styles
   exportEl.querySelectorAll('a, [data-link]').forEach(link => {
     link.style.removeProperty('pointer-events');
     link.style.removeProperty('cursor');
     if (!link.style.cssText) link.removeAttribute('style');
   });
 
-  // Remove highlight class for clean bold tags in Anki export
+  // Strip highlights for clean export
   exportEl.querySelectorAll('.highlight').forEach(el => {
     el.removeAttribute('class');
   });
@@ -346,7 +346,7 @@ const sendSelectedDict = (el) => {
 
   const dictionaryHtml = exportEl.outerHTML;
 
-  // Dictionary style selectors use distinct names, allowing simple text matching
+  // Match styles by unique dictionary name
   let styleHtml = '';
   glossaryEl.querySelectorAll('style').forEach(styleEl => {
     const css = styleEl.textContent.trim();
@@ -368,14 +368,14 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
   isPerformingLookup = true;
 
-  // Abort pending lookup fetch
+  // Abort pending fetch
   if (currentAbortController) {
     currentAbortController.abort();
   }
   currentAbortController = new AbortController();
   const { signal } = currentAbortController;
 
-  // Detect if this is a sub-word transition
+  // Detect sub-word transition
   let isSubword = false;
   let currentTerm = '';
   if (allEntries.length > 0 && currentEntryIndex < allEntries.length) {
@@ -384,7 +384,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
     isSubword = isWindowVisible && isVisible && currentTerm && currentTerm.includes(term);
   }
 
-  // If identical term and already visible, skip fetch/re-render to avoid flicker
+  // Skip redundant lookups
   if (isSubword && term === currentTerm && isWindowVisible && isVisible) {
     console.log('[UI] Identical term and already fully visible, skipping redundant lookup');
     isPerformingLookup = false;
@@ -408,15 +408,15 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
   currentPrioritizeKanjiMatch = prioritizeKanjiMatch !== undefined ? prioritizeKanjiMatch : false;
   currentPrioritizeHiraganaMatch = prioritizeHiraganaMatch !== undefined ? prioritizeHiraganaMatch : false;
 
-  // Transition screen logic for non-subword lookups
+  // Transition for non-subword lookups
   if (!isSubword) {
     allEntries = [];
     currentEntryIndex = 0;
     
-    // Trigger fade-out if currently visible
+    // Trigger fade-out if visible
     if (isVisible) {
       container.classList.remove('visible');
-      // Delay to allow partial fade before content swap
+      // Delay for partial fade before content swap
       await new Promise(resolve => setTimeout(resolve, 200));
     } else {
       container.classList.add('no-transition');
@@ -499,9 +499,8 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       return;
     }
 
-    // Fetch termEntries in parallel to get maxOriginalTextLength per entry,
-    // which reflects how many characters Yomitan consumed (including deconjugation).
-    // This correctly ranks deconjugated forms above shorter literal prefix matches.
+    // Reflects consumed characters including deconjugation
+    // Rank deconjugated forms above prefix matches
     const origLenMap = new Map();
     try {
       const termEntriesEndpoints = [
@@ -519,7 +518,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
             body: JSON.stringify({ term }),
           });
           if (r.ok) { teResult = await r.json(); break; }
-        } catch (_) { /* try next endpoint */ }
+        } catch (_) { /* Try next endpoint */ }
       }
       if (teResult && Array.isArray(teResult.dictionaryEntries)) {
         for (const de of teResult.dictionaryEntries) {
@@ -531,7 +530,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
           }
         }
       }
-    } catch (_) { /* non-critical; fall back to prefix-match sort */ }
+    } catch (_) { /* Fall back to prefix-match sort */ }
 
     const isHiraganaOnly = /^[\u3041-\u309F]+$/.test(term);
     const termChars = toNormalizedChars(term);
@@ -565,10 +564,10 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       const origA = getOrigLen(fa);
       const origB = getOrigLen(fb);
 
-      // Prefer the entry whose deinflection consumed more of the original text
+      // Prioritize entries with more deinflection characters
       if (origA !== origB) return origB - origA;
 
-      // Katakana priority when matched prefix is Katakana
+      // Prioritize Katakana for Katakana prefixes
       let isKataA = 0;
       let isKataB = 0;
       const termKataPrefixMatch = cleanSortTerm.match(/^[\u30A0-\u30FF]+/);
@@ -578,12 +577,12 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       }
       if (isKataA !== isKataB) return isKataB - isKataA;
 
-      // Fall back to kana prefix-match when termEntries gave the same (or no) length
+      // Fall back to kana prefix-match for equal lengths
       const lenA = computeMatchedLen(termChars, exprA, fa.reading || '');
       const lenB = computeMatchedLen(termChars, exprB, fb.reading || '');
 
       if (!currentPrioritizeKanjiMatch) {
-        // Matched-length priority (common prefix with term, kana-normalized)
+        // Matched-length priority
         if (lenA !== lenB) return lenB - lenA;
 
         // Kanji priority

@@ -1,12 +1,18 @@
 :root {
-  --bg-primary: rgba(17, 17, 17, 0.86);
+  --bg-color-hex: #111111;
+  --bg-opacity: 0.86;
+  --bg-primary: color-mix(in srgb, var(--bg-color-hex), transparent calc(100% - var(--bg-opacity) * 100%));
   --accent-color: #3db54a;
   --text-primary: #ffffff;
   --text-secondary: #aaaaaa;
-  --header-bg: rgba(61, 181, 74, 0.9);
+  --header-bg: rgba(255, 255, 255, 0.05);
   --radius: 8px;
   --font-sans: "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Segoe UI", sans-serif;
-  --item-hover: rgba(61, 181, 74, 0.4);
+  --item-hover: color-mix(in srgb, var(--accent-color), transparent 60%);
+  --history-width: 380px;
+  --history-max-height: 60vh;
+  --font-size-pri: 16px;
+  --font-size-sec: 13px;
 }
 
 body {
@@ -25,9 +31,9 @@ body {
 
 #history-container {
   width: 100%;
-  max-width: 380px;
-  max-height: 60vh;
-  margin-top: 75px;
+  max-width: var(--history-width);
+  max-height: var(--history-max-height);
+  margin-top: 15vh;
   margin-right: 20px;
   background-color: var(--bg-primary);
   border-radius: var(--radius);
@@ -50,14 +56,17 @@ body.visible #history-container {
   justify-content: space-between;
   align-items: center;
   background-color: var(--header-bg);
-  padding: 10px 14px;
+  height: 40px;
+  padding: 0 14px;
   border-radius: var(--radius) var(--radius) 0 0;
   font-weight: bold;
   letter-spacing: 1px;
+  box-sizing: border-box;
 }
 
 #header-title {
   font-size: 16px;
+  line-height: 40px;
 }
 
 .header-buttons {
@@ -129,19 +138,19 @@ body.visible #history-container {
 }
 
 .primary-text {
-  font-size: 16px;
+  font-size: var(--font-size-pri);
   line-height: 1.4;
   word-break: break-all;
 }
 
 .secondary-text {
-  font-size: 13px;
+  font-size: var(--font-size-sec);
   color: var(--text-secondary);
   margin-top: 4px;
   line-height: 1.3;
 }
 
-/* Fades */
+/* Dynamic scroll fades */
 .fade-mask {
   position: absolute;
   left: 0;
@@ -149,6 +158,7 @@ body.visible #history-container {
   height: 20px;
   pointer-events: none;
   z-index: 10;
+  transition: opacity 0.2s ease;
 }
 .top-fade {
   top: 40px;
@@ -158,4 +168,9 @@ body.visible #history-container {
   bottom: 0;
   border-radius: 0 0 var(--radius) var(--radius);
   background: linear-gradient(to top, var(--bg-primary), transparent);
+}
+
+#history-container.hide-top-fade .top-fade,
+#history-container.hide-bottom-fade .bottom-fade {
+  opacity: 0;
 }

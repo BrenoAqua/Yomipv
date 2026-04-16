@@ -41,11 +41,21 @@ document.addEventListener('copy', (e) => {
 
 ipcRenderer.on('copy-selection', () => {
   handleCopy();
+  window.getSelection().removeAllRanges();
 });
+
+const updateFades = () => {
+  const isAtTop = scrollClip.scrollTop < 5;
+  const isAtBottom = scrollClip.scrollHeight - scrollClip.scrollTop - scrollClip.clientHeight < 5;
+  
+  container.classList.toggle('hide-top-fade', isAtTop);
+  container.classList.toggle('hide-bottom-fade', isAtBottom);
+};
 
 scrollClip.addEventListener('scroll', () => {
   const isAtBottom = scrollClip.scrollHeight - scrollClip.scrollTop - scrollClip.clientHeight < 10;
   autoScroll = isAtBottom;
+  updateFades();
 });
 
 function makeItem(entry, config) {
@@ -65,8 +75,13 @@ function makeItem(entry, config) {
     itemEl.appendChild(secEl);
   }
 
-  itemEl.addEventListener('click', () => {
-    if (window.getSelection().toString().trim().length > 0) return;
+  itemEl.addEventListener('click', (e) => {
+    const selection = window.getSelection();
+    if (!selection.isCollapsed && selection.containsNode(e.target, true)) {
+      return;
+    }
+    selection.removeAllRanges();
+
     if (canExpand) {
       ipcRenderer.send('history-expand', entry);
     } else if (entry.start !== undefined && entry.start >= 0) {
@@ -88,8 +103,62 @@ ipcRenderer.on('update-history', (event, payload) => {
     animToggle.textContent = config.picture_animated ? 'GIF: ON' : 'GIF: OFF';
     animToggle.classList.toggle('active', config.picture_animated);
     if (config.history_accent_color) {
-      document.documentElement.style.setProperty('--accent-color', '#' + config.history_accent_color);
-      document.documentElement.style.setProperty('--header-bg', '#' + config.history_accent_color);
+      const color = config.history_accent_color.trim();
+      const lower = color.toLowerCase();
+      const isColorFunc = lower.startsWith('rgb') || lower.startsWith('rgba') || lower === 'transparent' || lower === '';
+      const accent = isColorFunc ? color : (color.startsWith('#') ? color : '#' + color);
+      document.documentElement.style.setProperty('--accent-color', accent);
+    }
+    if (config.history_font_size) {
+      document.documentElement.style.setProperty('--font-size-pri', config.history_font_size + 'px');
+    }
+    if (config.history_secondary_font_size) {
+      document.documentElement.style.setProperty('--font-size-sec', config.history_secondary_font_size + 'px');
+    }
+    if (config.history_width) {
+      document.documentElement.style.setProperty('--history-width', config.history_width + 'px');
+    }
+    if (config.history_max_height) {
+      const val = config.history_max_height.toString();
+      const hasUnit = /[a-z%]$/i.test(val);
+      if (hasUnit) {
+        document.documentElement.style.setProperty('--history-max-height', val);
+      } else {
+        const num = parseInt(val);
+        document.documentElement.style.setProperty('--history-max-height', num > 0 ? num + 'px' : '60vh');
+      }
+    }
+    if (config.history_background_opacity) {
+      let alpha = 0.86;
+      const op = config.history_background_opacity;
+      if (typeof op === 'string') {
+        if (op.endsWith('%')) {
+          alpha = parseInt(op) / 100;
+        } else {
+          alpha = parseInt(op, 16) / 255;
+        }
+      }
+      document.documentElement.style.setProperty('--bg-opacity', alpha);
+    }
+    if (config.history_font_family) {
+      document.documentElement.style.setProperty('--font-sans', `${config.history_font_family}, "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Segoe UI", sans-serif`);
+    }
+    if (config.history_border_radius) {
+      document.documentElement.style.setProperty('--radius', config.history_border_radius + 'px');
+    }
+    if (config.history_background_color) {
+      const color = config.history_background_color.trim();
+      const lower = color.toLowerCase();
+      const isColorFunc = lower.startsWith('rgb') || lower.startsWith('rgba') || lower === 'transparent' || lower === '';
+      const hbg = isColorFunc ? color : (color.startsWith('#') ? color : '#' + color);
+      document.documentElement.style.setProperty('--bg-color-hex', hbg);
+    }
+    if (config.history_header_background_color !== undefined) {
+      const hbg = (config.history_header_background_color || 'rgba(255, 255, 255, 0.1)').trim();
+      const lower = hbg.toLowerCase();
+      const isColorFunc = lower.startsWith('rgb') || lower.startsWith('rgba') || lower === 'transparent' || lower === '';
+      const finalHbg = isColorFunc ? hbg : (hbg.startsWith('#') ? hbg : '#' + hbg);
+      document.documentElement.style.setProperty('--header-bg', finalHbg);
     }
   }
 
@@ -99,11 +168,11 @@ ipcRenderer.on('update-history', (event, payload) => {
   prevIsAppending = isAppending;
 
   if (modeChanged || entriesArray.length < currentCount) {
-    // Full rebuild when mode switches or items were removed (e.g. clear)
+    // Rebuild on mode switch or item removal
     listContainer.innerHTML = '';
     entriesArray.forEach(entry => listContainer.appendChild(makeItem(entry, config)));
   } else {
-    // Patch text of existing items (monitor can merge primary and secondary text after initial render)
+    // Update existing items
     const existingItems = listContainer.children;
     for (let i = 0; i < currentCount && i < entriesArray.length; i++) {
       const entry = entriesArray[i];
@@ -133,7 +202,7 @@ ipcRenderer.on('update-history', (event, payload) => {
       }
     }
 
-    // Append genuinely new entries
+    // Append remaining entries
     for (let i = currentCount; i < entriesArray.length; i++) {
       listContainer.appendChild(makeItem(entriesArray[i], config));
     }
@@ -142,6 +211,7 @@ ipcRenderer.on('update-history', (event, payload) => {
   if (autoScroll) {
     scrollClip.scrollTop = scrollClip.scrollHeight;
   }
+  updateFades();
 });
 
 ipcRenderer.on('show-history', () => {
@@ -149,6 +219,7 @@ ipcRenderer.on('show-history', () => {
   if (autoScroll) {
     scrollClip.scrollTop = scrollClip.scrollHeight;
   }
+  updateFades();
 });
 
 ipcRenderer.on('hide-history', () => {

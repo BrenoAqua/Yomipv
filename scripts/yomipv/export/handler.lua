@@ -28,7 +28,7 @@ local DEFAULT_YOMITAN_FIELDS = {
 
 local EXPANSION_TIMEOUT = 0.05
 
--- Support both bracketed {h1} and comma-separated h1,h2 formats
+-- Support bracketed {h1} and comma-separated h1,h2 formats
 local function parse_handlebars(handlebar_string)
 	if not handlebar_string or handlebar_string == "" then
 		return {}
@@ -385,7 +385,7 @@ function Handler:handle_selector_result(context, selected_token)
 		)
 	)
 
-	-- Only pins an entry when the UI has explicitly synced one
+	-- Pin entry only when UI explicitly syncs one
 	local effective_expr = self.active_entry_expression
 	local effective_reading = self.active_entry_reading
 
@@ -486,7 +486,7 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 		end
 	end
 
-	-- Start Anki media path retrieval and local extraction
+	-- Retrieve Anki media path and start local extraction
 	self.deps.anki:get_media_path(function(media_dir, media_err)
 		if media_err or not media_dir or media_dir == "" then
 			msg.error("Anki media path error: " .. tostring(media_err))
@@ -580,7 +580,7 @@ function Handler:process_note_content(context, entry, picture, audio, selected_t
 			split_cloze(context.sub.primary_sid, entry.expression, selected_token.text, selected_token.offset)
 	end
 
-	-- Narrow highlight to word selected in the lookup
+	-- Narrow highlight to word selected in lookup
 	if not Collections.is_void(cloze_body) then
 		local expression = entry.expression
 		local hint = self.last_selection_hint
