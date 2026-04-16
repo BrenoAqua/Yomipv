@@ -20,6 +20,11 @@ container.addEventListener('pointerleave', () => {
   ipcRenderer.send('history-set-ignore-mouse', true);
 });
 
+document.body.addEventListener('contextmenu', (e) => {
+  const hasSelection = window.getSelection().toString().length > 0;
+  ipcRenderer.send('show-context-menu', hasSelection);
+});
+
 document.addEventListener('selectionchange', () => {
   if (window.getSelection().toString().trim()) {
     autoScroll = false;

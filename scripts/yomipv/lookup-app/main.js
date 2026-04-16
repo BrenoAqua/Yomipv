@@ -484,16 +484,17 @@ ipcMain.on('open-inspector', () => {
 });
 
 ipcMain.on('show-context-menu', (event, hasSelection) => {
-  const template = [
-    {
-      label: 'Copy',
-      enabled: hasSelection,
-      click: () => {
-        if (mainWindow) {
-          mainWindow.webContents.send('copy-selection');
-        }
-      }
-    },
+  const isHistory = historyWindow && event.sender === historyWindow.webContents;
+  const copyItem = {
+    label: 'Copy',
+    enabled: hasSelection,
+    click: () => {
+      event.sender.send('copy-selection');
+    }
+  };
+
+  const template = isHistory ? [copyItem] : [
+    copyItem,
     { type: 'separator' },
     {
       label: 'Inspect Element',
@@ -504,9 +505,7 @@ ipcMain.on('show-context-menu', (event, hasSelection) => {
     {
       label: 'Refresh CSS',
       click: () => {
-        if (mainWindow) {
-          mainWindow.webContents.send('refresh-css');
-        }
+        event.sender.send('refresh-css');
       }
     }
   ];
