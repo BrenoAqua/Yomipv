@@ -4,6 +4,7 @@ const listContainer = document.getElementById('history-list');
 const scrollClip = document.getElementById('history-scroll-clip');
 const headerTitle = document.getElementById('header-title');
 const animToggle = document.getElementById('anim-toggle');
+const settingsBtn = document.getElementById('open-settings');
 const clearBtn = document.getElementById('clear-history');
 
 let isAppending = false;
@@ -233,6 +234,10 @@ ipcRenderer.on('hide-history', () => {
 
 animToggle.addEventListener('click', () => {
   ipcRenderer.send('history-toggle-anim');
+});
+
+settingsBtn.addEventListener('click', () => {
+  ipcRenderer.send('open-settings');
 });
 
 clearBtn.addEventListener('click', () => {

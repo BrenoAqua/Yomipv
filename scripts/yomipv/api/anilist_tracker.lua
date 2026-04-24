@@ -86,8 +86,8 @@ function AnilistTracker:trigger_update()
 	end
 
 	if not episode_num then
-		msg.warn("AniList Tracker: Could not extract episode number from file (" .. name .. ").")
-		return
+		msg.info("AniList Tracker: No episode number found, defaulting to 1 (likely a movie/special).")
+		episode_num = 1
 	end
 
 	self.anilist:check_and_update(name, season_num, episode_num, function(success, err)

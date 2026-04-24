@@ -5,12 +5,16 @@ const net = require('net');
 
 let mainWindow;
 let historyWindow = null;
+let settingsWindow = null;
 let pendingHide = false;
 let historyHideTimeout = null;
 let lastSelectedDictHtml = '';
+let tray = null;
 
 let lookupSuspended = false;
 let lookupSuspendTimeout = null;
+
+const appIconPath = path.join(__dirname, 'build', 'lookup-app.png');
 
 let isContextMenuOpen = false;
 let appIsFocused = true;
@@ -26,13 +30,16 @@ function isHistoryDevToolsOpen() {
   return !!(historyWindow && historyWindow.webContents.isDevToolsOpened());
 }
 
+let mpvIpcQueue = [];
+
 // Sends JSON command to mpv IPC pipe
 function sendMpvMessage(message, ...args) {
   if (mpvIpc) {
     const cmd = { command: [message, ...args] };
     mpvIpc.write(JSON.stringify(cmd) + '\n');
   } else {
-    console.warn(`[IPC] Cannot send ${message}: mpvIpc not connected`);
+    console.warn(`[IPC] Queuing ${message}: mpvIpc not connected`);
+    mpvIpcQueue.push([message, ...args]);
   }
 }
 
@@ -50,6 +57,7 @@ function createWindow() {
     maximizable: false,
     alwaysOnTop: true,
     type: 'toolbar', 
+    icon: appIconPath,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -88,6 +96,7 @@ function createHistoryWindow() {
     maximizable: false,
     alwaysOnTop: true,
     type: 'toolbar',
+    icon: appIconPath,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -101,6 +110,48 @@ function createHistoryWindow() {
   historyWindow.loadFile('history.html');
 }
 
+// Show settings window
+function createSettingsWindow() {
+  if (settingsWindow) {
+    settingsWindow.show();
+    settingsWindow.focus();
+    return;
+  }
+
+  settingsWindow = new BrowserWindow({
+    width: 900,
+    height: 700,
+    frame: false,
+    show: false,
+    icon: appIconPath,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  settingsWindow.loadFile('settings.html');
+  settingsWindow.once('ready-to-show', () => settingsWindow.show());
+  settingsWindow.on('closed', () => settingsWindow = null);
+}
+
+function createTray() {
+  const iconPath = path.join(__dirname, 'build', 'lookup-app.png');
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  tray = new Tray(icon);
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Yomipv Lookup', enabled: false },
+    { type: 'separator' },
+    { label: 'Settings', click: () => createSettingsWindow() },
+    { label: 'History', click: () => sendMpvMessage('script-message', 'yomipv-toggle-history') },
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() }
+  ]);
+  tray.setToolTip('Yomipv');
+  tray.setContextMenu(contextMenu);
+  tray.on('double-click', () => createSettingsWindow());
+}
+
 // mpv IPC pipe path from CLI argument
 const ipcPipeArg = process.argv.find(arg => arg.startsWith('--ipc-pipe='));
 const ipcPipe = ipcPipeArg ? ipcPipeArg.split('=')[1] : null;
@@ -111,6 +162,10 @@ if (ipcPipe) {
     console.log('[IPC] Connecting to:', ipcPipe);
     mpvIpc = net.connect(ipcPipe, () => {
       console.log('[IPC] Connected to mpv');
+      while (mpvIpcQueue.length > 0) {
+        const [msg, ...args] = mpvIpcQueue.shift();
+        sendMpvMessage(msg, ...args);
+      }
     });
     mpvIpc.on('error', (err) => {
       console.warn('[IPC] mpv connection error:', err.message);
@@ -126,8 +181,12 @@ if (ipcPipe) {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.yomipv.lookup');
+  }
   createWindow();
   createHistoryWindow();
+  createTray();
 
   // HTTP server for terms and commands from mpv Lua
   const server = http.createServer((req, res) => {
@@ -183,6 +242,13 @@ app.whenReady().then(() => {
             pendingHide = true;
             mainWindow.webContents.send('window-hide-request');
           }
+          return;
+        }
+
+        if (req.url === '/settings-open') {
+          console.log('[IPC] Settings open signal received');
+          res.end('ok');
+          createSettingsWindow();
           return;
         }
 
@@ -246,6 +312,34 @@ app.whenReady().then(() => {
             }
           } catch (e) {
             console.error('Failed to parse history body', e);
+          }
+          res.end('ok');
+          return;
+        }
+
+        if (req.url === '/settings-data') {
+          console.log('[IPC] Settings data received');
+          try {
+            const data = JSON.parse(body);
+            if (settingsWindow) {
+              settingsWindow.webContents.send('settings-data', data);
+            }
+          } catch (e) {
+            console.error('Failed to parse settings body', e);
+          }
+          res.end('ok');
+          return;
+        }
+
+        if (req.url === '/profile-list-data') {
+          console.log('[IPC] Profile list received');
+          try {
+            const data = JSON.parse(body);
+            if (settingsWindow) {
+              settingsWindow.webContents.send('profile-list', data);
+            }
+          } catch (e) {
+            console.error('Failed to parse profile list body', e);
           }
           res.end('ok');
           return;
@@ -594,4 +688,38 @@ ipcMain.on('history-set-ignore-mouse', (event, ignore) => {
   if (historyWindow) {
     historyWindow.setIgnoreMouseEvents(ignore, { forward: true });
   }
+});
+
+// Settings and profiles IPC
+ipcMain.on('open-settings', () => {
+  createSettingsWindow();
+});
+
+ipcMain.on('settings-window-ready', (event) => {
+  sendMpvMessage('script-message', 'yomipv-get-settings');
+});
+
+ipcMain.on('settings-set', (event, { key, value }) => {
+  sendMpvMessage('script-message', 'yomipv-set-setting', key, value.toString());
+});
+
+ipcMain.on('profile-list-request', () => {
+  sendMpvMessage('script-message', 'yomipv-list-profiles');
+});
+
+ipcMain.on('profile-switch', (event, name) => {
+  sendMpvMessage('script-message', 'yomipv-switch-profile', name);
+});
+
+ipcMain.on('profile-create', (event, name) => {
+  sendMpvMessage('script-message', 'yomipv-create-profile', name);
+});
+
+ipcMain.on('profile-delete', (event, name) => {
+  sendMpvMessage('script-message', 'yomipv-delete-profile', name);
+});
+
+// Incoming from MPV
+ipcMain.on('profile-list', (event, profiles) => {
+  if (settingsWindow) settingsWindow.webContents.send('profile-list', profiles);
 });
