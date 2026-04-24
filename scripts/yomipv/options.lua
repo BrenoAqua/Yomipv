@@ -283,18 +283,34 @@ local default_options = {
 
 	--[[ MPV Settings ]]
 
-
 	osd_messages = true, -- Show OSD messages
+
+	--[[ Profile settings ]]
+
+	current_profile = "default", -- Active profile name
+	key_cycle_profile = "Ctrl+p", -- Cycle through available profiles
+	key_open_settings = "Ctrl+i", -- Open settings menu
 }
 
 local options = default_options
 local mp_options = require("mp.options")
 mp_options.read_options(options, "yomipv")
 
+-- Snapshot defaults for type-coercion
+options.defaults = {}
+for k, v in pairs(default_options) do
+	options.defaults[k] = v
+end
+
 function options.save(key, value)
-	local path = mp.find_config_file("script-opts/yomipv.conf")
+	local filename = "yomipv.conf"
+	if key ~= "current_profile" and options.current_profile and options.current_profile ~= "default" then
+		filename = "yomipv_" .. options.current_profile .. ".conf"
+	end
+
+	local path = mp.find_config_file("script-opts/" .. filename)
 	if not path then
-		path = mp.command_native({ "expand-path", "~~/script-opts/yomipv.conf" })
+		path = mp.command_native({ "expand-path", "~~/script-opts/" .. filename })
 	end
 	if not path then
 		return false
@@ -323,6 +339,15 @@ function options.save(key, value)
 			for _, line in ipairs(lines) do
 				file:write(line .. "\n")
 			end
+			file:close()
+			return true
+		end
+	else
+		-- Append new key if it doesn't exist
+		file = io.open(path, "a")
+		if file then
+			local val_str = type(value) == "boolean" and (value and "yes" or "no") or tostring(value)
+			file:write(key .. "=" .. val_str .. "\n")
 			file:close()
 			return true
 		end

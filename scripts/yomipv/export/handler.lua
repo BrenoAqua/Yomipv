@@ -1149,11 +1149,8 @@ function Handler:init()
 	end
 end
 
-function Handler:toggle_colorizer()
-	self.config.colorizer_enabled = not self.config.colorizer_enabled
-	self.config.save("colorizer_enabled", self.config.colorizer_enabled)
+function Handler:sync_state()
 	if self.config.colorizer_enabled then
-		Player.notify("Colorizer: Enabled", "info", 2)
 		mp.set_property("sub-visibility", "no")
 		local sub = self.deps.tracker.export_current_session()
 		if sub and sub.primary_sid and sub.primary_sid ~= "" then
@@ -1167,10 +1164,16 @@ function Handler:toggle_colorizer()
 			self.deps.selector:clear_passive()
 		end
 	else
-		Player.notify("Colorizer: Disabled", "info", 2)
 		mp.set_property("sub-visibility", "yes")
 		self.deps.selector:clear_passive()
 	end
+end
+
+function Handler:toggle_colorizer()
+	self.config.colorizer_enabled = not self.config.colorizer_enabled
+	self.config.save("colorizer_enabled", self.config.colorizer_enabled)
+	Player.notify("Colorizer: " .. (self.config.colorizer_enabled and "Enabled" or "Disabled"), "info", 2)
+	self:sync_state()
 end
 
 function Handler:set_manual_start()

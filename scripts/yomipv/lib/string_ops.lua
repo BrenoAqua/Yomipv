@@ -119,6 +119,9 @@ function StringOps.clean_title(title, path)
 	-- Strip extension once at the start
 	s = s:gsub("%.%w+$", "")
 
+	-- Truncate at SxxExx
+	s = s:gsub("[%.%s_%-]+[Ss]%d%d?[Ee]%d%d?.*", "")
+
 	-- Strip hex checksums
 	s = s:gsub("[%[%(]%x%x%x%x%x%x%x%x[%]%]%)]", "")
 
@@ -131,7 +134,8 @@ function StringOps.clean_title(title, path)
 		"1080[pP]", "720[pP]", "480[pP]", "2160[pP]", "1440[pP]", "576[pP]",
 		"[0-9]+[xX][0-9]+",
 		"[xX]26[45]", "[hH]%.?26[45]", "[hH][eE][vV][cC]",
-		"[aA][cC]3", "[aA][aA][cC]", "[mM][pP]3", "[fF][lL][aA][cC][0-9%.]*",
+		"[eE]?[%-]?[aA][cC]3", "[aA][aA][cC]", "[mM][pP]3", "[fF][lL][aA][cC][0-9%.]*",
+		"[dD][tT][sS]%-[hH][dD]", "[dD][tT][sS]", "[tT][rR][uU][eE][hH][dD]", "[oO][pP][uU][sS]",
 		"[dD][dD][pP][0-9%.]*", "[hH][iI]10[pP]?", "[0-9]+%-?bit",
 		"[nN][fF]", "[wW][eE][bB]%-?[dD][lL]", "[bB][lL][uU]%-?[rR][aA][yY]",
 		"[mM][uU][lL][tT][iI][^%s%.%-_]*", "[mM][sS][uU][bB][sS]?", "[dD][uU][aA][lL]",
@@ -142,6 +146,7 @@ function StringOps.clean_title(title, path)
 		"[bB][dD][rR][iI][pP]?", "[bB][dD]", "[tT][vV]", "[wW][eE][bB]",
 		"[vV][pP]9", "[aA][vV]1", "[xX][vV][iI][dD]",
 		"[sS][pP][eE][cC][iI][aA][lL]", "[oO][vV][aA]", "[oO][nN][aA]", "[oO][aA][dD]",
+		"[aA][tT][mM][oO][sS]", "[rR][eE][mM][uU][xX]",
 		"[aA][mM][zZ][nN]", "[jJ][pP][nN]", "[dD][sS][nN][pP]", "[cC][rR]", "[fF][uU][nN][iI]",
 		"[aA][bB][eE][mM][aA]", "[wW][oO][wW][oO][wW]", "[bB][sS]%-?[0-9]*", "[aA][tT]%-?[xX]",
 		"[mM][xX]", "[tT][vV][kK]", "[tT][vV][oO]", "[aA][nN][yY][iI][vV]", "[hH][iI][dD][iI][vV][eE]",
@@ -200,6 +205,9 @@ function StringOps.clean_title(title, path)
 		s = StringOps.trim(s)
 		s = s:gsub(pattern, "")
 	end
+
+	-- Strip trailing group tags and bracketed info
+	s = s:gsub("%s*[%[%(][^%]]-[%]%)]%s*$", "")
 
 	-- Strip trailing punctuation and delimiters
 	s = s:gsub("[%s%-%:_%.]+$", "")

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Yomipv Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div id="titlebar">
+    <span id="titlebar-title">Yomipv Settings</span>
+    <button id="titlebar-close" title="Close">✕</button>
+  </div>
+
+  <div id="layout">
+    <nav id="sidebar">
+      <button class="nav-item active" data-section="general" id="nav-general">
+        General
+      </button>
+
+      <button class="nav-item" data-section="anki" id="nav-anki">
+        Anki
+      </button>
+
+      <button class="nav-item" data-section="yomitan" id="nav-yomitan">
+        Yomitan
+      </button>
+
+      <button class="nav-item" data-section="picture" id="nav-picture">
+        Picture
+      </button>
+
+      <button class="nav-item" data-section="audio" id="nav-audio">
+        Audio
+      </button>
+
+      <button class="nav-item" data-section="selector" id="nav-selector">
+        Selector
+      </button>
+
+      <button class="nav-item" data-section="history" id="nav-history">
+        History
+      </button>
+
+      <button class="nav-item" data-section="subtitles" id="nav-subtitles">
+        Subtitles
+      </button>
+
+      <button class="nav-item" data-section="anilist" id="nav-anilist">
+        Anilist
+      </button>
+
+      <button class="nav-item" data-section="updater" id="nav-updater">
+        Updater
+      </button>
+
+      <button class="nav-item" data-section="mpv" id="nav-mpv">
+        MPV Settings
+      </button>
+    </nav>
+
+    <main id="content">
+      <section class="settings-section" id="section-general">
+        <h2>General</h2>
+        <div class="field-group" id="fields-general"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-anki">
+        <h2>Anki Settings</h2>
+        <div class="field-group" id="fields-anki"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-yomitan">
+        <h2>Yomitan</h2>
+        <div class="field-group" id="fields-yomitan"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-picture">
+        <h2>Picture</h2>
+        <div class="field-group" id="fields-picture"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-audio">
+        <h2>Audio</h2>
+        <div class="field-group" id="fields-audio"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-selector">
+        <h2>Selector</h2>
+        <div class="field-group" id="fields-selector"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-history">
+        <h2>History Panel</h2>
+        <div class="field-group" id="fields-history"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-subtitles">
+        <h2>Subtitles</h2>
+        <div class="field-group" id="fields-subtitles"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-anilist">
+        <h2>Anilist</h2>
+        <div class="field-group" id="fields-anilist"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-updater">
+        <h2>Updater</h2>
+        <div class="field-group" id="fields-updater"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-mpv">
+        <h2>MPV Settings</h2>
+        <div class="field-group" id="fields-mpv"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="settings.js"></script>
+</body>
+</html>

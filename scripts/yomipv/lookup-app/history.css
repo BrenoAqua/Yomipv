@@ -62,6 +62,8 @@ body.visible #history-container {
   font-weight: bold;
   letter-spacing: 1px;
   box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #header-title {
@@ -88,6 +90,10 @@ body.visible #history-container {
 
 .header-buttons button:hover, .header-buttons button.active {
   color: #ffffff;
+}
+
+#open-settings {
+  font-size: 18px !important;
 }
 
 #history-scroll-clip {

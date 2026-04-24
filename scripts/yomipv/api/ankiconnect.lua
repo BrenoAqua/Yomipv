@@ -11,7 +11,6 @@ function AnkiConnect.new(config, curl)
 	local obj = {
 		config = config,
 		curl = curl,
-		url = "http://" .. config.ankiconnect_url,
 		media_dir_path = nil,
 		_pending_media_path_callbacks = nil,
 	}
@@ -20,9 +19,14 @@ function AnkiConnect.new(config, curl)
 	return obj
 end
 
-function AnkiConnect:request(action, params, callback)
-	if not self.url then return callback(nil, "AnkiConnect URL missing") end
+function AnkiConnect:get_url()
+	local url = self.config.ankiconnect_url or "127.0.0.1:8765"
+	if not url:find("^http") then url = "http://" .. url end
+	return url
+end
 
+function AnkiConnect:request(action, params, callback)
+	local url = self:get_url()
 	local body = { action = action, version = DEFAULT_VERSION, params = params or {} }
 	if self.config.ankiconnect_api_key and self.config.ankiconnect_api_key ~= "" then
 		body.key = self.config.ankiconnect_api_key
@@ -32,7 +36,7 @@ function AnkiConnect:request(action, params, callback)
 	local json_body, _ = utils.format_json(body)
 	json_body = json_body:gsub('"params":%s*%[%s*%]', '"params":{}')
 
-	Api.request(self.curl, self.url, json_body, function(response, err)
+	Api.request(self.curl, url, json_body, function(response, err)
 		if err then return callback(nil, err) end
 		if response.error then return callback(nil, response.error) end
 		callback(response.result, nil)
