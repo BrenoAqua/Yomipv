@@ -9,10 +9,10 @@ local WHITESPACE_PATTERN = "[ \t\n\r]+"
 local SUBTITLE_TAGS_PATTERN = "{[^}]-}"
 local SUBTITLE_SYMBOLS = { "🔊", "➨", "➡", "➔", "➜", "➝", "➞" }
 local BRACKET_PATTERNS = {
-	"（[^）]-）", -- Full-width
+	"（.-）", -- Full-width
 	"%([^%)]-%)", -- ASCII
 	"%[[^%]]-%]", -- Square brackets
-	"【[^】]-】", -- Lenticular brackets
+	"【.-】", -- Lenticular brackets
 }
 
 -- Normalizes whitespace and optionally preserves newlines
@@ -133,12 +133,13 @@ function StringOps.clean_title(title, path)
 	local tags = {
 		"1080[pP]", "720[pP]", "480[pP]", "2160[pP]", "1440[pP]", "576[pP]",
 		"[0-9]+[xX][0-9]+",
-		"[xX]26[45]", "[hH]%.?26[45]", "[hH][eE][vV][cC]",
+		"[xX]26[45]", "[hH]%.?26[45]", "[hH][eE][vV][cC]", "[aA][vV][cC]",
 		"[eE]?[%-]?[aA][cC]3", "[aA][aA][cC]", "[mM][pP]3", "[fF][lL][aA][cC][0-9%.]*",
 		"[dD][tT][sS]%-[hH][dD]", "[dD][tT][sS]", "[tT][rR][uU][eE][hH][dD]", "[oO][pP][uU][sS]",
 		"[dD][dD][pP][0-9%.]*", "[hH][iI]10[pP]?", "[0-9]+%-?bit",
-		"[nN][fF]", "[wW][eE][bB]%-?[dD][lL]", "[bB][lL][uU]%-?[rR][aA][yY]",
-		"[mM][uU][lL][tT][iI][^%s%.%-_]*", "[mM][sS][uU][bB][sS]?", "[dD][uU][aA][lL]",
+		"[nN][fF]", "[wW][eE][bB]%-?[dD][lL]", "[wW][eE][bB][rR][iI][pP]",
+		"[hH][dD][rR][0-9]*", "[dD][vV]", "[bB][lL][uU]%-?[rR][aA][yY]",
+		"[mM][uU][lL][tT][iI][^%s%.%-_]*", "[mM][sS][uU][bB][sS]?", "[dD][uU][aA][lL]", "[aA][uU][dD][iI][oO]",
 		"[yY][uU][rR][aA][sS][uU][kK][aA]", "[tT][oO][oO][nN][sS]?[hH][uU][bB]?",
 		"[0-9]+%-[bB][iI][tT]",
 		"[uU][nN][cC][eE][nN][sS][oO][rR][eE][dD]", "[cC][eE][nN][sS][oO][rR][eE][dD]",
@@ -230,6 +231,7 @@ function StringOps.parse_season_episode(title, path)
 	-- Independent season detection (before stripping brackets/parentheses)
 	if not season then
 		season = source:match("[ _%.%-][Ss]eason%s*(%d+)")
+			or source:match("^[Ss]eason%s*(%d+)")
 			or source:match("[ _%.%-][Ss](%d+)[ _%.%-]")
 			or source:match("[ _%.%-][Ss](%d+)$")
 			or source:match("^(%d+)[a-z][a-z]%s+[Ss]eason")
@@ -239,8 +241,8 @@ function StringOps.parse_season_episode(title, path)
 	-- Strip common tags/info that interfere with episode detection
 	source = source:gsub("%[[^%]]-%]", "")
 	source = source:gsub("%([^%)]-%)", "")
-	source = source:gsub("（[^）]-）", "")
-	source = source:gsub("【[^】]-】", "")
+	source = source:gsub("（.-）", "")
+	source = source:gsub("【.-】", "")
 	source = source:gsub("[vV][0-9]+", "") -- v2, v3
 	source = source:gsub("[%s%.%-_][12][0-9][0-9][0-9][%s%.%-_]", " ") -- years
 	source = source:gsub("[%s%.%-_][12][0-9][0-9][0-9]$", "") -- years at end
@@ -250,6 +252,7 @@ function StringOps.parse_season_episode(title, path)
 	source = source:gsub("[%s%.%-_][xX]26[45]", "")
 	source = source:gsub("[%s%.%-_][hH]%.?26[45]", "")
 	source = source:gsub("[%s%.%-_][hH][eE][vV][cC]", "")
+	source = source:gsub("[%s%.%-_][aA][vV][cC]", "")
 	source = source:gsub("[%s%.%-_][aA][cC]3", "")
 	source = source:gsub("[%s%.%-_][aA][aA][cC]", "")
 	source = source:gsub("[%s%.%-_][mM][pP]3", "")
