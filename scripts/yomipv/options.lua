@@ -285,11 +285,15 @@ local default_options = {
 
 	osd_messages = true, -- Show OSD messages
 
-	--[[ Profile settings ]]
+	--[[ Settings ]]
 
-	current_profile = "default", -- Active profile name
+	auto_load = true, -- Automatically load Yomipv on startup
+    current_profile = "default", -- Active profile
+
+	-- Keybindings
+	key_load_yomipv = "y", -- Key to load Yomipv manually
+    key_open_settings = "Ctrl+i", -- Open settings menu
 	key_cycle_profile = "Ctrl+p", -- Cycle through available profiles
-	key_open_settings = "Ctrl+i", -- Open settings menu
 }
 
 local options = default_options
