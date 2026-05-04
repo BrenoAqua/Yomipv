@@ -32,9 +32,12 @@ function showToast(msg) {
 // Settings field rendering
 const fieldConfigs = {
   general: [
+    { type: 'header', label: 'Startup' },
+    { key: 'auto_load', label: 'Auto-load Yomipv', type: 'checkbox' },
     { type: 'header', label: 'Profiles' },
     { type: 'profiles-manager' },
     { type: 'header', label: 'Keybindings' },
+    { key: 'key_load_yomipv', label: 'Load Yomipv Manually', type: 'keybind' },
     { key: 'key_cycle_profile', label: 'Cycle Profiles', type: 'keybind' },
     { key: 'key_open_settings', label: 'Open Settings', type: 'keybind' }
   ],

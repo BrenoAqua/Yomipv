@@ -36,59 +36,73 @@ local Updater = require("lib.updater")
 local MouseHandler = require("interface.mouse_handler")
 local Profiles = require("lib.profiles")
 
-msg.info("Yomipv v" .. yomipv_version .. ": Initializing...")
+local yomitan, anki, anilist, builder, formatter, history, handler
+local is_yomipv_loaded = false
 
-local yomitan = Yomitan.new(config, Curl)
-local anki = AnkiConnect.new(config, Curl)
-local anilist = Anilist.new(config, Curl)
+local function load_yomipv()
+	if is_yomipv_loaded then
+		Player.notify("Yomipv is already loaded", "info", 2)
+		return
+	end
+	is_yomipv_loaded = true
 
-Picture.init(config)
-Audio.init(config)
-Monitor.init(config)
-AnilistTracker.init(config, anilist)
+	msg.info("Yomipv v" .. yomipv_version .. ": Initializing...")
 
-local builder = Builder.new(config)
-local formatter = Formatter.new(config)
+	yomitan = Yomitan.new(config, Curl)
+	anki = AnkiConnect.new(config, Curl)
+	anilist = Anilist.new(config, Curl)
 
-local history = History:new()
-history:init(config)
+	Picture.init(config)
+	Audio.init(config)
+	Monitor.init(config)
+	AnilistTracker.init(config, anilist)
 
-local handler = Handler:new()
-handler.config = config
-handler.deps = {
-	tracker = Monitor,
-	history = history,
-	selector = Selector,
-	yomitan = yomitan,
-	anki = anki,
-	media = {
-		picture = Picture,
-		audio = Audio,
-		set_output_dir = function(dir)
-			Picture.set_output_dir(dir)
-			Audio.set_output_dir(dir)
-		end,
-	},
-	builder = builder,
-	formatter = formatter,
-	curl = Curl,
-}
-handler:init()
+	builder = Builder.new(config)
+	formatter = Formatter.new(config)
 
-history:set_exporter_handler(handler)
-Observer.init(handler, yomitan, config)
-Observer.start()
-PrimarySid.init(config)
-SecondarySid.init(config)
-SubtitleSync.init(config)
-SubtitleFilter.init(config)
+	history = History:new()
+	history:init(config)
 
-Launcher.launch_lookup_app(config)
-Updater.check_for_updates(config, yomipv_version, Curl)
-MouseHandler.init(config, handler, history, Selector)
+	handler = Handler:new()
+	handler.config = config
+	handler.deps = {
+		tracker = Monitor,
+		history = history,
+		selector = Selector,
+		yomitan = yomitan,
+		anki = anki,
+		media = {
+			picture = Picture,
+			audio = Audio,
+			set_output_dir = function(dir)
+				Picture.set_output_dir(dir)
+				Audio.set_output_dir(dir)
+			end,
+		},
+		builder = builder,
+		formatter = formatter,
+		curl = Curl,
+	}
+	handler:init()
+
+	history:set_exporter_handler(handler)
+	Observer.init(handler, yomitan, config)
+	Observer.start()
+	PrimarySid.init(config)
+	SecondarySid.init(config)
+	SubtitleSync.init(config)
+	SubtitleFilter.init(config)
+
+	Launcher.launch_lookup_app(config)
+	Updater.check_for_updates(config, yomipv_version, Curl)
+	MouseHandler.init(config, handler, history, Selector)
+
+	msg.info("Yomipv v" .. yomipv_version .. ": Initialized")
+	Player.notify("Yomipv v" .. yomipv_version .. " loaded", "success", 2)
+end
 
 mp.register_event("file-loaded", function()
-	yomitan:clear_cache()
+	if yomitan then yomitan:clear_cache() end
 end)
 
 mp.observe_property("focused", "bool", function(_, is_focused)
@@ -168,6 +182,7 @@ end)
 
 -- Process selection events and coordinate dictionary expansion
 mp.register_script_message("yomipv-active-entry", function(exp, red)
+	if not handler then return end
 	handler:set_active_entry(exp, red)
 	if handler.deps.selector and handler.deps.selector.active then
 		handler.deps.selector:expand_selection_to_match(exp, red)
@@ -175,25 +190,30 @@ mp.register_script_message("yomipv-active-entry", function(exp, red)
 end)
 
 mp.register_script_message("yomipv-sync-selection", function(text)
-	handler:sync_selection(text)
+	if handler then handler:sync_selection(text) end
 end)
 
 mp.register_script_message("yomipv-sync-selection-hint", function(text)
-	handler:sync_selection_hint(text)
+	if handler then handler:sync_selection_hint(text) end
 end)
 
 mp.register_script_message("yomipv-dictionary-selected", function(text)
-	handler:set_selected_dictionary(text)
+	if handler then handler:set_selected_dictionary(text) end
 end)
 
 local function register_keybindings()
 	local bindings = {
+		{ config.key_load_yomipv, "yomipv-load", load_yomipv },
 		{ config.key_open_settings, "yomipv-open-settings", function() send_to_lookup_app("settings-open", {}) end },
 		{ config.key_open_selector, "yomipv-export", function() if handler then handler:start_export(history) end end },
-		{ config.key_toggle_colorizer, "yomipv-toggle-colorizer", function() handler:toggle_colorizer() end },
-		{ config.key_append_mode, "yomipv-toggle-append-mode", function() handler:toggle_mark_range() end },
+		{ config.key_toggle_colorizer, "yomipv-toggle-colorizer", function()
+			if handler then handler:toggle_colorizer() end
+		end },
+		{ config.key_append_mode, "yomipv-toggle-append-mode", function()
+			if handler then handler:toggle_mark_range() end
+		end },
 		{ config.key_toggle_history, "yomipv-toggle-history", function()
-			if history.active then history:close() else history:open() end
+			if history then if history.active then history:close() else history:open() end end
 		end },
 		{ config.key_sub_seek_next, "yomipv-sub-seek-next", function() mp.commandv("sub-seek", "1") end },
 		{ config.key_sub_seek_prev, "yomipv-sub-seek-prev", function() mp.commandv("sub-seek", "-1") end },
@@ -201,11 +221,17 @@ local function register_keybindings()
 		{ config.key_secondary_sub_prev, "yomipv-secondary-sub-prev", function() SecondarySid.cycle_track(-1) end },
 		{ config.key_update, "yomipv-update", function() Updater.launch(config) end },
 		{ config.key_build_ankidb, "yomipv-build-anki-db", function()
-			AnkiDBBuilder.new(config, anki):build_with_notification(handler)
+			if handler then AnkiDBBuilder.new(config, anki):build_with_notification(handler) end
 		end },
-		{ config.key_set_timing_start, "yomipv-set-timing-start", function() handler:set_manual_start() end },
-		{ config.key_set_timing_end, "yomipv-set-timing-end", function() handler:set_manual_end() end },
-		{ config.key_clear_timings, "yomipv-clear-timings", function() handler:clear_manual_timings() end },
+		{ config.key_set_timing_start, "yomipv-set-timing-start", function()
+			if handler then handler:set_manual_start() end
+		end },
+		{ config.key_set_timing_end, "yomipv-set-timing-end", function()
+			if handler then handler:set_manual_end() end
+		end },
+		{ config.key_clear_timings, "yomipv-clear-timings", function()
+			if handler then handler:clear_manual_timings() end
+		end },
 		{ config.key_toggle_picture_animated, "yomipv-toggle-picture-animated", function()
 			config.picture_animated = not config.picture_animated
 			config.save("picture_animated", config.picture_animated)
@@ -231,7 +257,7 @@ local function register_keybindings()
 			local new_name, err = Profiles.cycle(config, config.defaults)
 			if new_name then
 				config.save("current_profile", new_name)
-				handler:sync_state()
+				if handler then handler:sync_state() end
 				register_keybindings()
 				Player.notify("Profile: " .. new_name, "info", 3)
 				send_to_lookup_app("settings-data", { config = get_clean_config() })
@@ -256,7 +282,7 @@ mp.register_script_message("yomipv-switch-profile", function(name)
 
 	if ok then
 		config.save("current_profile", name)
-		handler:sync_state()
+		if handler then handler:sync_state() end
 		register_keybindings()
 		Player.notify("Profile: " .. name, "success", 2)
 		send_to_lookup_app("settings-data", { config = get_clean_config() })
@@ -291,7 +317,7 @@ end)
 if config.current_profile and config.current_profile ~= "default" then
 	local ok, err = Profiles.load(config.current_profile, config, config.defaults)
 	if ok then
-		handler:sync_state()
+		if handler then handler:sync_state() end
 	else
 		msg.warn("Startup profile load failed: " .. tostring(err))
 		config.current_profile = "default"
@@ -300,5 +326,6 @@ end
 
 register_keybindings()
 
-msg.info("Yomipv v" .. yomipv_version .. ": Initialized")
-Player.notify("Yomipv v" .. yomipv_version .. " loaded", "success", 2)
+if config.auto_load then
+	load_yomipv()
+end
