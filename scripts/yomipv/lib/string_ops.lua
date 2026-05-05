@@ -119,8 +119,9 @@ function StringOps.clean_title(title, path)
 	-- Strip extension once at the start
 	s = s:gsub("%.%w+$", "")
 
-	-- Truncate at SxxExx
+	-- Truncate at SxxExx or compact Sxxxx
 	s = s:gsub("[%.%s_%-]+[Ss]%d%d?[Ee]%d%d?.*", "")
+	s = s:gsub("[%.%s_%-]+[Ss]%d%d%d%d.*", "")
 
 	-- Strip hex checksums
 	s = s:gsub("[%[%(]%x%x%x%x%x%x%x%x[%]%]%)]", "")
@@ -227,6 +228,15 @@ function StringOps.parse_season_episode(title, path)
 
 	-- Combined S01E01 format
 	season, episode = source:match("[Ss](%d+)[Ee](%d+)")
+
+	-- Fallback for compact 4-digit blocks
+	if not season then
+		local block = source:match("[Ss](%d%d%d%d)")
+		if block then
+			season = block:sub(1, 2)
+			episode = block:sub(3, 4)
+		end
+	end
 
 	-- Independent season detection (before stripping brackets/parentheses)
 	if not season then
