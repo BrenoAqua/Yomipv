@@ -136,12 +136,7 @@ function Anilist:update_episode(media_id, episode_num, callback)
 end
 
 function Anilist:check_and_update(title, season_num, episode_num, callback)
-	local query = title
-	if season_num and tonumber(season_num) then
-		if tonumber(season_num) > 1 then
-			query = string.format("%s Season %s", title, tostring(season_num))
-		end
-	end
+	local season_n = tonumber(season_num)
 
 	episode_num = tonumber(episode_num)
 	if not episode_num then
@@ -149,13 +144,21 @@ function Anilist:check_and_update(title, season_num, episode_num, callback)
 		return
 	end
 
-	msg.info(string.format("Looking up AniList for '%s' to update Episode %s", query, tostring(episode_num)))
+	local primary_query = title
+	local fallback_query = nil
+	if season_n and season_n > 1 then
+		-- Try "Season N" first; bare number suffix is the fallback
+		primary_query = string.format("%s Season %d", title, season_n)
+		fallback_query = string.format("%s %d", title, season_n)
+	end
+
+	msg.info(string.format("Looking up AniList for '%s' to update Episode %s", primary_query, tostring(episode_num)))
 
 	local function process_media(media, target_ep)
 		if not media.episodes or target_ep <= media.episodes then
 			msg.info(string.format("Updating Media [%d] %s to Episode %d", media.id, media.title.romaji, target_ep))
 			self:update_episode(media.id, target_ep, function(success, err)
-				if callback then callback(success, err) end
+				if callback then callback(success, err, media.title.romaji) end
 			end)
 			return
 		end
@@ -184,21 +187,33 @@ function Anilist:check_and_update(title, season_num, episode_num, callback)
 					process_media(next_media, remaining_ep)
 				else
 					msg.warn("Failed to fetch sequel ID " .. tostring(sequel_id))
-					self:update_episode(media.id, media.episodes, function(s, e) if callback then callback(s, e) end end)
+					self:update_episode(media.id, media.episodes, function(s, e) if callback then callback(s, e, media.title.romaji) end end)
 				end
 			end)
 		else
 			msg.warn("No further sequel found. Capping update to max episodes.")
-			self:update_episode(media.id, media.episodes, function(s, e) if callback then callback(s, e) end end)
+			self:update_episode(media.id, media.episodes, function(s, e) if callback then callback(s, e, media.title.romaji) end end)
 		end
 	end
 
-	self:search_anime_by_title(query, function(search_success, media_or_err)
-		if not search_success then
-			if callback then callback(false, media_or_err) end
+	self:search_anime_by_title(primary_query, function(search_success, media_or_err)
+		if search_success then
+			process_media(media_or_err, episode_num)
 			return
 		end
-		process_media(media_or_err, episode_num)
+		-- Primary query failed; retry with bare number suffix if available
+		if fallback_query then
+			msg.info(string.format("Retrying with fallback query '%s'", fallback_query))
+			self:search_anime_by_title(fallback_query, function(fb_success, fb_media_or_err)
+				if fb_success then
+					process_media(fb_media_or_err, episode_num)
+				else
+					if callback then callback(false, fb_media_or_err) end
+				end
+			end)
+		else
+			if callback then callback(false, media_or_err) end
+		end
 	end)
 end
 

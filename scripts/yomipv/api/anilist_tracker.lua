@@ -90,9 +90,10 @@ function AnilistTracker:trigger_update()
 		episode_num = 1
 	end
 
-	self.anilist:check_and_update(name, season_num, episode_num, function(success, err)
+	self.anilist:check_and_update(name, season_num, episode_num, function(success, err, resolved_title)
 		if success then
-			local msg_text = string.format("AniList: Updated %s to Ep %s", name, tostring(episode_num))
+			local display = resolved_title or name
+			local msg_text = string.format("AniList: Updated %s to Ep %s", display, tostring(episode_num))
 			if self.config.anilist_show_notifications then
 				Player.notify(msg_text, "success", 3)
 			end
