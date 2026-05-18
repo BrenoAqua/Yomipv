@@ -36,7 +36,7 @@ local Updater = require("lib.updater")
 local MouseHandler = require("interface.mouse_handler")
 local Profiles = require("lib.profiles")
 
-local yomitan, anki, anilist, builder, formatter, history, handler
+local yomitan, anki, anilist, builder, formatter, history, handler, register_keybindings
 local is_yomipv_loaded = false
 
 local function load_yomipv()
@@ -96,6 +96,8 @@ local function load_yomipv()
 	Launcher.launch_lookup_app(config)
 	Updater.check_for_updates(config, yomipv_version, Curl)
 	MouseHandler.init(config, handler, history, Selector)
+
+	register_keybindings()
 
 	msg.info("Yomipv v" .. yomipv_version .. ": Initialized")
 	Player.notify("Yomipv v" .. yomipv_version .. " loaded", "success", 2)
@@ -201,71 +203,79 @@ mp.register_script_message("yomipv-dictionary-selected", function(text)
 	if handler then handler:set_selected_dictionary(text) end
 end)
 
-local function register_keybindings()
+function register_keybindings()
 	local bindings = {
 		{ config.key_load_yomipv, "yomipv-load", load_yomipv },
-		{ config.key_open_settings, "yomipv-open-settings", function() send_to_lookup_app("settings-open", {}) end },
-		{ config.key_open_selector, "yomipv-export", function() if handler then handler:start_export(history) end end },
-		{ config.key_toggle_colorizer, "yomipv-toggle-colorizer", function()
-			if handler then handler:toggle_colorizer() end
-		end },
-		{ config.key_append_mode, "yomipv-toggle-append-mode", function()
-			if handler then handler:toggle_mark_range() end
-		end },
-		{ config.key_toggle_history, "yomipv-toggle-history", function()
-			if history then if history.active then history:close() else history:open() end end
-		end },
-		{ config.key_sub_seek_next, "yomipv-sub-seek-next", function() mp.commandv("sub-seek", "1") end },
-		{ config.key_sub_seek_prev, "yomipv-sub-seek-prev", function() mp.commandv("sub-seek", "-1") end },
-		{ config.key_secondary_sub_next, "yomipv-secondary-sub-next", function() SecondarySid.cycle_track(1) end },
-		{ config.key_secondary_sub_prev, "yomipv-secondary-sub-prev", function() SecondarySid.cycle_track(-1) end },
-		{ config.key_update, "yomipv-update", function() Updater.launch(config) end },
-		{ config.key_build_ankidb, "yomipv-build-anki-db", function()
-			if handler then AnkiDBBuilder.new(config, anki):build_with_notification(handler) end
-		end },
-		{ config.key_set_timing_start, "yomipv-set-timing-start", function()
-			if handler then handler:set_manual_start() end
-		end },
-		{ config.key_set_timing_end, "yomipv-set-timing-end", function()
-			if handler then handler:set_manual_end() end
-		end },
-		{ config.key_clear_timings, "yomipv-clear-timings", function()
-			if handler then handler:clear_manual_timings() end
-		end },
-		{ config.key_toggle_picture_animated, "yomipv-toggle-picture-animated", function()
-			config.picture_animated = not config.picture_animated
-			config.save("picture_animated", config.picture_animated)
-			Player.notify("Animated pictures: " .. (config.picture_animated and "Enabled" or "Disabled"), "info")
-			if history and history.active then history:update(true) end
-		end },
-		{ config.key_toggle_mora_navigation, "yomipv-toggle-mora-navigation", function()
-			config.selector_mora_navigation = not config.selector_mora_navigation
-			config.save("selector_mora_navigation", config.selector_mora_navigation)
-			Player.notify("Mora navigation: " .. (config.selector_mora_navigation and "Enabled" or "Disabled"), "info")
-			if Selector.active then
-				Selector.style.selector_mora_navigation = config.selector_mora_navigation
-				Selector:render()
-			end
-		end },
-		{ config.key_toggle_selector_trigger_on_mouse_move, "yomipv-toggle-selector-trigger-on-mouse-move", function()
-			config.selector_trigger_on_mouse_move = not config.selector_trigger_on_mouse_move
-			config.save("selector_trigger_on_mouse_move", config.selector_trigger_on_mouse_move)
-			local status = config.selector_trigger_on_mouse_move and "Enabled" or "Disabled"
-			Player.notify("Selector mouse trigger: " .. status, "info")
-		end },
-		{ config.key_cycle_profile, "yomipv-cycle-profile", function()
-			local new_name, err = Profiles.cycle(config, config.defaults)
-			if new_name then
-				config.save("current_profile", new_name)
-				if handler then handler:sync_state() end
-				register_keybindings()
-				Player.notify("Profile: " .. new_name, "info", 3)
-				send_to_lookup_app("settings-data", { config = get_clean_config() })
-			else
-				Player.notify(err or "Profile switch failed", "warn", 3)
-			end
-		end }
 	}
+
+	if is_yomipv_loaded then
+		local active_bindings = {
+			{ config.key_open_settings, "yomipv-open-settings", function() send_to_lookup_app("settings-open", {}) end },
+			{ config.key_open_selector, "yomipv-export", function() if handler then handler:start_export(history) end end },
+			{ config.key_toggle_colorizer, "yomipv-toggle-colorizer", function()
+				if handler then handler:toggle_colorizer() end
+			end },
+			{ config.key_append_mode, "yomipv-toggle-append-mode", function()
+				if handler then handler:toggle_mark_range() end
+			end },
+			{ config.key_toggle_history, "yomipv-toggle-history", function()
+				if history then if history.active then history:close() else history:open() end end
+			end },
+			{ config.key_sub_seek_next, "yomipv-sub-seek-next", function() mp.commandv("sub-seek", "1") end },
+			{ config.key_sub_seek_prev, "yomipv-sub-seek-prev", function() mp.commandv("sub-seek", "-1") end },
+			{ config.key_secondary_sub_next, "yomipv-secondary-sub-next", function() SecondarySid.cycle_track(1) end },
+			{ config.key_secondary_sub_prev, "yomipv-secondary-sub-prev", function() SecondarySid.cycle_track(-1) end },
+			{ config.key_update, "yomipv-update", function() Updater.launch(config) end },
+			{ config.key_build_ankidb, "yomipv-build-anki-db", function()
+				if handler then AnkiDBBuilder.new(config, anki):build_with_notification(handler) end
+			end },
+			{ config.key_set_timing_start, "yomipv-set-timing-start", function()
+				if handler then handler:set_manual_start() end
+			end },
+			{ config.key_set_timing_end, "yomipv-set-timing-end", function()
+				if handler then handler:set_manual_end() end
+			end },
+			{ config.key_clear_timings, "yomipv-clear-timings", function()
+				if handler then handler:clear_manual_timings() end
+			end },
+			{ config.key_toggle_picture_animated, "yomipv-toggle-picture-animated", function()
+				config.picture_animated = not config.picture_animated
+				config.save("picture_animated", config.picture_animated)
+				Player.notify("Animated pictures: " .. (config.picture_animated and "Enabled" or "Disabled"), "info")
+				if history and history.active then history:update(true) end
+			end },
+			{ config.key_toggle_mora_navigation, "yomipv-toggle-mora-navigation", function()
+				config.selector_mora_navigation = not config.selector_mora_navigation
+				config.save("selector_mora_navigation", config.selector_mora_navigation)
+				Player.notify("Mora navigation: " .. (config.selector_mora_navigation and "Enabled" or "Disabled"), "info")
+				if Selector.active then
+					Selector.style.selector_mora_navigation = config.selector_mora_navigation
+					Selector:render()
+				end
+			end },
+			{ config.key_toggle_selector_trigger_on_mouse_move, "yomipv-toggle-selector-trigger-on-mouse-move", function()
+				config.selector_trigger_on_mouse_move = not config.selector_trigger_on_mouse_move
+				config.save("selector_trigger_on_mouse_move", config.selector_trigger_on_mouse_move)
+				local status = config.selector_trigger_on_mouse_move and "Enabled" or "Disabled"
+				Player.notify("Selector mouse trigger: " .. status, "info")
+			end },
+			{ config.key_cycle_profile, "yomipv-cycle-profile", function()
+				local new_name, err = Profiles.cycle(config, config.defaults)
+				if new_name then
+					config.save("current_profile", new_name)
+					if handler then handler:sync_state() end
+					register_keybindings()
+					Player.notify("Profile: " .. new_name, "info", 3)
+					send_to_lookup_app("settings-data", { config = get_clean_config() })
+				else
+					Player.notify(err or "Profile switch failed", "warn", 3)
+				end
+			end }
+		}
+		for _, b in ipairs(active_bindings) do
+			table.insert(bindings, b)
+		end
+	end
 
 	for _, b in ipairs(bindings) do
 		local key, name, fn = b[1], b[2], b[3]
