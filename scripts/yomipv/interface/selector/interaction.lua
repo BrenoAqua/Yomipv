@@ -71,8 +71,50 @@ local function hide_if_needed(selector, trigger_source)
 	end
 end
 
+local function get_term_bounds(selector)
+	local first, last = nil, nil
+	for i, t in ipairs(selector.tokens) do
+		if t.is_term then
+			if not first then
+				first = i
+			end
+			last = i
+		end
+	end
+	return first, last
+end
+
 local function on_left(selector)
 	selector.selection_len = 1
+
+	local first_term_index, last_term_index = get_term_bounds(selector)
+
+	local is_leftmost = false
+	if first_term_index and selector.index == first_term_index then
+		if selector.style.selector_mora_navigation then
+			if not selector.mora_index or selector.mora_index <= 1 then
+				is_leftmost = true
+			end
+		else
+			is_leftmost = true
+		end
+	end
+
+	if is_leftmost and last_term_index then
+		selector.index = last_term_index
+		if selector.style.selector_mora_navigation then
+			local last_token = selector.tokens[last_term_index]
+			selector.mora_index = selector.get_char_count(last_token.text)
+		else
+			selector.mora_index = nil
+		end
+		if first_term_index ~= last_term_index then
+			hide_if_needed(selector, "navigation")
+		end
+		selector:render()
+		trigger_lookup_if_enabled(selector, "navigation")
+		return
+	end
 
 	if selector.style.selector_mora_navigation and selector.mora_index and selector.mora_index > 1 then
 		selector.mora_index = selector.mora_index - 1
@@ -104,6 +146,38 @@ end
 
 local function on_right(selector)
 	selector.selection_len = 1
+
+	local first_term_index, last_term_index = get_term_bounds(selector)
+
+	local is_rightmost = false
+	if last_term_index and selector.index == last_term_index then
+		if selector.style.selector_mora_navigation then
+			local token = selector.tokens[selector.index]
+			local char_count = selector.get_char_count(token.text)
+			local current_mora = selector.mora_index or 1
+			if current_mora >= char_count then
+				is_rightmost = true
+			end
+		else
+			is_rightmost = true
+		end
+	end
+
+	if is_rightmost and first_term_index then
+		selector.index = first_term_index
+		if selector.style.selector_mora_navigation then
+			selector.mora_index = 1
+		else
+			selector.mora_index = nil
+		end
+		if first_term_index ~= last_term_index then
+			hide_if_needed(selector, "navigation")
+		end
+		selector:render()
+		trigger_lookup_if_enabled(selector, "navigation")
+		return
+	end
+
 	local token = selector.tokens[selector.index]
 
 	if selector.style.selector_mora_navigation then
@@ -157,43 +231,48 @@ local function find_vertical_neighbor(selector, direction)
 	local min_y_dist = math.huge
 	local min_x_dist = math.huge
 
+	local min_y, max_y = math.huge, -math.huge
 	-- 5px buffer prevents false positives from rounding and glyph overlap
 	for _, box in ipairs(selector.token_boxes) do
-		if not selector.tokens[box.index].is_term or box.index == selector.index then
-			goto continue
-		end
+		if selector.tokens[box.index].is_term then
+			local by = (box.y1 + box.y2) / 2
+			if by < min_y then min_y = by end
+			if by > max_y then max_y = by end
 
-		local by = (box.y1 + box.y2) / 2
-
-		local is_in_direction = (direction == "up" and by < ref_y - 5) or (direction == "down" and by > ref_y + 5)
-
-		if is_in_direction then
-			local y_dist = math.abs(by - ref_y)
-			if y_dist < min_y_dist then
-				min_y_dist = y_dist
+			if box.index ~= selector.index then
+				local is_in_direction = (direction == "up" and by < ref_y - 5) or (direction == "down" and by > ref_y + 5)
+				if is_in_direction then
+					local y_dist = math.abs(by - ref_y)
+					if y_dist < min_y_dist then
+						min_y_dist = y_dist
+					end
+				end
 			end
 		end
-		::continue::
 	end
 
+	local target_y = nil
+	local is_wrap = false
 	if min_y_dist == math.huge then
-		return nil
+		target_y = direction == "up" and (max_y ~= -math.huge and max_y or nil) or (min_y ~= math.huge and min_y or nil)
+		is_wrap = true
 	end
 
 	-- Pick horizontally closest candidate on nearest line with 20px tolerance
 	for _, box in ipairs(selector.token_boxes) do
-		if not selector.tokens[box.index].is_term or box.index == selector.index then
-			goto continue
-		end
+		if selector.tokens[box.index].is_term and box.index ~= selector.index then
+			local bx = (box.x1 + box.x2) / 2
+			local by = (box.y1 + box.y2) / 2
 
-		local bx = (box.x1 + box.x2) / 2
-		local by = (box.y1 + box.y2) / 2
+			local is_valid_candidate
+			if is_wrap then
+				is_valid_candidate = target_y and math.abs(by - target_y) < 20
+			else
+				local is_in_direction = (direction == "up" and by < ref_y - 5) or (direction == "down" and by > ref_y + 5)
+				is_valid_candidate = is_in_direction and math.abs(by - ref_y) < min_y_dist + 20
+			end
 
-		local is_in_direction = (direction == "up" and by < ref_y - 5) or (direction == "down" and by > ref_y + 5)
-
-		if is_in_direction then
-			local y_dist = math.abs(by - ref_y)
-			if y_dist < min_y_dist + 20 then
+			if is_valid_candidate then
 				local x_dist = math.abs(bx - ref_x)
 				if x_dist < min_x_dist then
 					min_x_dist = x_dist
@@ -201,7 +280,6 @@ local function find_vertical_neighbor(selector, direction)
 				end
 			end
 		end
-		::continue::
 	end
 
 	return best_index

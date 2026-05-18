@@ -187,12 +187,16 @@ function Anilist:check_and_update(title, season_num, episode_num, callback)
 					process_media(next_media, remaining_ep)
 				else
 					msg.warn("Failed to fetch sequel ID " .. tostring(sequel_id))
-					self:update_episode(media.id, media.episodes, function(s, e) if callback then callback(s, e, media.title.romaji) end end)
+					self:update_episode(media.id, media.episodes, function(s, e)
+						if callback then callback(s, e, media.title.romaji) end
+					end)
 				end
 			end)
 		else
 			msg.warn("No further sequel found. Capping update to max episodes.")
-			self:update_episode(media.id, media.episodes, function(s, e) if callback then callback(s, e, media.title.romaji) end end)
+			self:update_episode(media.id, media.episodes, function(s, e)
+				if callback then callback(s, e, media.title.romaji) end
+			end)
 		end
 	end
 
