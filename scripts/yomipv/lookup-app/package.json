@@ -19,6 +19,10 @@
   "build": {
     "appId": "com.yomipv.lookup",
     "productName": "YomipvLookup",
+    "files": [
+      "**/*",
+      "build/lookup-app.png"
+    ],
     "directories": {
       "output": "dist"
     },
