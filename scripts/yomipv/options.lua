@@ -152,6 +152,7 @@ local default_options = {
 	colorizer_enabled = false,
 	selector_colorize_words = false,
 	selector_colorize_underline = false,
+	selector_colorize_opacity = 100,
 
 	-- Lookup
 	pre_tokenize = true, -- Pre-tokenize subtitles as they appear

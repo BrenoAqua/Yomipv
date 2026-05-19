@@ -87,32 +87,53 @@ local function word_color(entry)
 	return nil
 end
 
+local function is_term_match(hw)
+	if type(hw) ~= "table" then return true end
+	if not hw.sources or #hw.sources == 0 then return true end
+	for _, src in ipairs(hw.sources) do
+		if src.matchSource == "term" then
+			return true
+		end
+	end
+	return false
+end
+
+local function find_clean_term(db, term)
+	if type(term) ~= "string" or term == "" then return nil, nil end
+	local entry = db[term]
+	if entry then return entry, term end
+
+	local particles = { "が", "の", "に", "を", "と", "は", "も", "で", "へ", "から", "より" }
+	for _, p in ipairs(particles) do
+		if term:sub(1, #p) == p then
+			local stripped = term:sub(#p + 1)
+			if #stripped > 3 then
+				local stripped_entry = db[stripped]
+				if stripped_entry then return stripped_entry, stripped end
+			end
+		end
+	end
+	return nil, nil
+end
+
 local function resolve_term_color(db, hw)
 	if type(hw) == "string" then
 		if hw ~= "" then
-			local entry = db[hw]
-			if entry then return word_color(entry), hw end
+			local entry, matched = find_clean_term(db, hw)
+			if entry then return word_color(entry), matched end
 		end
 	elseif type(hw) == "table" then
-		-- Check for term/expression in this table
 		local term = hw.term or hw.expression
 		if type(term) == "string" and term ~= "" then
-			local entry = db[term]
-			if entry then return word_color(entry), term end
+			if is_term_match(hw) then
+				local entry, matched = find_clean_term(db, term)
+				if entry then return word_color(entry), matched end
+			end
 		end
 
-		-- Recurse into array elements if it's an array
 		for _, v in ipairs(hw) do
 			local color, found_term = resolve_term_color(db, v)
 			if color then return color, found_term end
-		end
-
-		-- Fallback: check all string values in the table if no ipairs match
-		for _, v in pairs(hw) do
-			if type(v) == "string" and v ~= "" then
-				local entry = db[v]
-				if entry then return word_color(entry), v end
-			end
 		end
 	end
 	return nil
@@ -126,9 +147,112 @@ function AnkiDB.get_word_color(headwords)
 	local color, term = resolve_term_color(db, headwords)
 	if color then
 		msg.info("anki_db: found '" .. term .. "' -> color: " .. color)
-		return color
+		return color, term
 	end
 	return nil
+end
+
+local function get_token_reps(token)
+	local reps = {}
+	local seen = {}
+	local function add_rep(r)
+		if type(r) == "string" and r ~= "" and not seen[r] then
+			seen[r] = true
+			table.insert(reps, r)
+		end
+	end
+	add_rep(token.text)
+	local function collect_hw(hw)
+		if type(hw) == "table" then
+			local term = hw.term or hw.expression
+			add_rep(term)
+			for _, v in ipairs(hw) do
+				collect_hw(v)
+			end
+		elseif type(hw) == "string" then
+			add_rep(hw)
+		end
+	end
+	collect_hw(token.headwords)
+	return reps
+end
+
+local function generate_combinations(reps_list, idx, current_str, results)
+	if idx > #reps_list then
+		results[current_str] = true
+		return
+	end
+	for _, rep in ipairs(reps_list[idx]) do
+		generate_combinations(reps_list, idx + 1, current_str .. rep, results)
+	end
+end
+
+function AnkiDB.get_tokens_colors(tokens)
+	local db = load_db()
+	if not db or not tokens then return {} end
+
+	local colors = {}
+	local n = #tokens
+	local i = 1
+	while i <= n do
+		local matched_len = nil
+		local matched_color = nil
+		local matched_term = nil
+
+		for len = math.min(6, n - i + 1), 2, -1 do
+			local reps_list = {}
+			local has_selectable = false
+			for k = i, i + len - 1 do
+				local reps = get_token_reps(tokens[k])
+				if #reps > 0 then
+					table.insert(reps_list, reps)
+				end
+				if tokens[k].is_term then
+					has_selectable = true
+				end
+			end
+
+			if #reps_list == len and has_selectable then
+				local combinations = {}
+				generate_combinations(reps_list, 1, "", combinations)
+
+				for comb in pairs(combinations) do
+					local entry, matched = find_clean_term(db, comb)
+					if entry and matched == comb then
+						local color = word_color(entry)
+						if color then
+							matched_len = len
+							matched_color = color
+							matched_term = matched
+							break
+						end
+					end
+				end
+			end
+
+			if matched_len then
+				break
+			end
+		end
+
+		if matched_len then
+			for k = i, i + matched_len - 1 do
+				colors[k] = { color = matched_color, term = matched_term }
+			end
+			i = i + matched_len
+		else
+			local token = tokens[i]
+			if token.headwords then
+				local color, term = resolve_term_color(db, token.headwords)
+				if color then
+					colors[i] = { color = color, term = term }
+				end
+			end
+			i = i + 1
+		end
+	end
+
+	return colors
 end
 
 -- Forces a reload on next access (call after anki_words.json is regenerated)

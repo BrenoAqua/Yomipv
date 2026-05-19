@@ -4,6 +4,10 @@
 local mp = require("mp")
 local msg = require("mp.msg")
 local SubUtils = require("subtitle.subtitle_utils")
+local StringOps = require("lib.string_ops")
+local MediaUtils = require("media.helpers")
+
+local ffmpeg_exec = MediaUtils.resolve_binary("ffmpeg")
 
 local Prefetcher = {
 	_entries = {}, -- {start_s, end_s, text}
@@ -24,9 +28,7 @@ local function parse_srt(raw)
 			-- Multiline text capture
 			local text_raw = block:match("%d+:%d+:%d+[,.]%d+ %-%-> %d+:%d+:%d+[,.]%d+[ \t]*\r?\n(.*)")
 			if text_raw and not SubUtils.is_song_text(text_raw) then
-				local text = SubUtils.strip_tags(text_raw:gsub("\n", " "))
-				text = text:gsub("%s+$", "")
-
+				local text = StringOps.clean_subtitle(text_raw, true)
 				if t_start and t_end and text ~= "" then
 					table.insert(entries, { start_s = t_start, end_s = t_end, text = text })
 				end
@@ -76,7 +78,7 @@ function Prefetcher._extract_from_file(file_path)
 		capture_stdout = true,
 		capture_stderr = true,
 		args = {
-			"ffmpeg",
+			ffmpeg_exec,
 			"-hide_banner",
 			"-v", "quiet",
 			"-i", file_path,
@@ -111,7 +113,7 @@ function Prefetcher._extract_from_video(video_path, ff_index)
 		capture_stdout = true,
 		capture_stderr = true,
 		args = {
-			"ffmpeg",
+			ffmpeg_exec,
 			"-hide_banner",
 			"-v", "quiet",
 			"-i", video_path,

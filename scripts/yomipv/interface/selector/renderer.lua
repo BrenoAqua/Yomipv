@@ -225,11 +225,28 @@ function Renderer.render(selector)
 			end
 
 			if not added_underline and selector.style.colorize_underline and wc then
+				local color = type(wc) == "table" and wc.color or wc
+				local term = type(wc) == "table" and wc.term or nil
+				local underline_x = current_x
+				local underline_w = t_seg.width
+
+				if term and t_seg.visual_text and t_seg.visual_text ~= term then
+					local text_len = #t_seg.visual_text
+					local term_len = #term
+					if text_len > term_len and t_seg.visual_text:sub(text_len - term_len + 1) == term then
+						local prefix = t_seg.visual_text:sub(1, text_len - term_len)
+						local prefix_w = Renderer.measure_width(prefix, font_size, font_name, sub_bold)
+						underline_x = current_x + prefix_w
+						underline_w = t_seg.width - prefix_w
+					end
+				end
+
 				table.insert(underlines, {
-					x = current_x,
+					x = underline_x,
 					y = y_line + u_offset,
-					w = t_seg.width,
-					color = wc,
+					w = underline_w,
+					color = color,
+					is_colorizer = true,
 				})
 			end
 
@@ -283,7 +300,8 @@ function Renderer.render(selector)
 				end
 			else
 				if wc and not selector.style.colorize_underline then
-					osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", wc, t_seg.visual_text, main_color))
+					local color = type(wc) == "table" and wc.color or wc
+					osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", color, t_seg.visual_text, main_color))
 				else
 					osd:append(t_seg.visual_text)
 				end
@@ -310,7 +328,15 @@ function Renderer.render(selector)
 		osd:pos(0, 0)
 		osd:alignment(7)
 		osd:color(u.color or u_color)
-		osd:alpha("00")
+
+		local alpha = "00"
+		if u.is_colorizer and selector.style.colorize_opacity then
+			local opacity = selector.style.colorize_opacity
+			local alpha_val = math.floor((100 - opacity) / 100 * 255 + 0.5)
+			alpha = string.format("%02X", math.max(0, math.min(255, alpha_val)))
+		end
+		osd:alpha(alpha)
+
 		osd:border(border_size)
 		osd:shadow(0)
 		osd:append(string.format("{\\3c&H%s&}", border_color))

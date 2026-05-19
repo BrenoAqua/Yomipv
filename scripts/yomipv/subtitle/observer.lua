@@ -17,10 +17,19 @@ function Observer.init(handler, yomitan, config)
 	Observer.yomitan = yomitan
 	Observer.config = config
 
-	-- Load the prefetcher whenever a new file starts
-	mp.register_event("file-loaded", function()
+	if config.pre_tokenize then
+		Prefetcher.load()
+	end
+
+	mp.observe_property("sid", "native", function(_, val)
 		if config.pre_tokenize then
-			Prefetcher.load()
+			if val and val ~= "no" then
+				mp.add_timeout(0.05, function()
+					Prefetcher.load()
+				end)
+			else
+				Prefetcher.reset()
+			end
 		end
 	end)
 end
@@ -101,7 +110,7 @@ function Observer.handle_subtitle_change(name, value)
 
 		-- Tokenize upcoming subtitles
 		local current_pos = mp.get_property_number("time-pos", 0)
-		local next_lines = Prefetcher.get_next_lines(current_pos, current_text, 2)
+		local next_lines = Prefetcher.get_next_lines(current_pos, stable_cleaned, 2)
 		for _, line in ipairs(next_lines) do
 			local next_cleaned = StringOps.clean_subtitle(line, true)
 			if next_cleaned and next_cleaned ~= "" then
