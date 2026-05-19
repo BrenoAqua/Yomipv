@@ -686,6 +686,10 @@ ipcMain.on('history-toggle-anim', () => {
   sendMpvMessage('script-message', 'yomipv-history-toggle-anim');
 });
 
+ipcMain.on('history-toggle-time-source', () => {
+  sendMpvMessage('script-message', 'yomipv-history-toggle-time-source');
+});
+
 ipcMain.on('history-set-ignore-mouse', (event, ignore) => {
   if (historyWindow) {
     historyWindow.setIgnoreMouseEvents(ignore, { forward: true });

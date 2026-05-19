@@ -244,6 +244,15 @@ function register_keybindings()
 				Player.notify("Animated pictures: " .. (config.picture_animated and "Enabled" or "Disabled"), "info")
 				if history and history.active then history:update(true) end
 			end },
+			{ config.key_toggle_picture_timestamp_source, "yomipv-toggle-picture-timestamp-source", function()
+				local cur = config.picture_timestamp_source
+				local next_val = cur == "subtitle_start" and "current_position" or "subtitle_start"
+				config.picture_timestamp_source = next_val
+				config.save("picture_timestamp_source", next_val)
+				local display_val = next_val == "subtitle_start" and "Subtitle Start" or "Current Position"
+				Player.notify("Timestamp source: " .. display_val, "info")
+				if history and history.active then history:update(true) end
+			end },
 			{ config.key_toggle_mora_navigation, "yomipv-toggle-mora-navigation", function()
 				config.selector_mora_navigation = not config.selector_mora_navigation
 				config.save("selector_mora_navigation", config.selector_mora_navigation)

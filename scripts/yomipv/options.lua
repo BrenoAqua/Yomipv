@@ -212,6 +212,7 @@ local default_options = {
 	key_clear_timings = "e",
 	key_build_ankidb = "B",
 	key_toggle_picture_animated = "g",
+	key_toggle_picture_timestamp_source = "Ctrl+g",
 
 	-- Misc
 	lookup_app_path = "lookup-app",

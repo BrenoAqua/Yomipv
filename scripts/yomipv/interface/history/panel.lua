@@ -91,6 +91,7 @@ function History:update(force)
 	local safe_config = {}
 	if (self.config) then
 		safe_config.picture_animated = self.config.picture_animated
+		safe_config.picture_timestamp_source = self.config.picture_timestamp_source
 		safe_config.history_accent_color = self.config.history_accent_color
 		safe_config.history_show_secondary = self.config.history_show_secondary
 		safe_config.history_width = self.config.history_width
@@ -148,6 +149,18 @@ function History:_register_ipc_hooks()
 			self.config.save("picture_animated", self.config.picture_animated)
 			local status = self.config.picture_animated and "Enabled" or "Disabled"
 			Player.notify("Animated pictures: " .. status, "info")
+			self:update(true)
+		end
+	end)
+
+	mp.register_script_message("yomipv-history-toggle-time-source", function()
+		if self.config then
+			local cur = self.config.picture_timestamp_source
+			local next_val = cur == "subtitle_start" and "current_position" or "subtitle_start"
+			self.config.picture_timestamp_source = next_val
+			self.config.save("picture_timestamp_source", next_val)
+			local display_val = next_val == "subtitle_start" and "Subtitle Start" or "Current Position"
+			Player.notify("Timestamp source: " .. display_val, "info")
 			self:update(true)
 		end
 	end)

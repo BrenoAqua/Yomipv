@@ -4,6 +4,7 @@ const listContainer = document.getElementById('history-list');
 const scrollClip = document.getElementById('history-scroll-clip');
 const headerTitle = document.getElementById('header-title');
 const animToggle = document.getElementById('anim-toggle');
+const timeToggle = document.getElementById('time-toggle');
 const settingsBtn = document.getElementById('open-settings');
 const clearBtn = document.getElementById('clear-history');
 
@@ -107,7 +108,10 @@ ipcRenderer.on('update-history', (event, payload) => {
 
   if (config) {
     animToggle.textContent = config.picture_animated ? 'GIF: ON' : 'GIF: OFF';
-    animToggle.classList.toggle('active', config.picture_animated);
+    if (config.picture_timestamp_source) {
+      const isSub = config.picture_timestamp_source === 'subtitle_start';
+      timeToggle.textContent = isSub ? 'SUB START' : 'CUR POS';
+    }
     if (config.history_accent_color) {
       const color = config.history_accent_color.trim();
       const lower = color.toLowerCase();
@@ -234,6 +238,10 @@ ipcRenderer.on('hide-history', () => {
 
 animToggle.addEventListener('click', () => {
   ipcRenderer.send('history-toggle-anim');
+});
+
+timeToggle.addEventListener('click', () => {
+  ipcRenderer.send('history-toggle-time-source');
 });
 
 settingsBtn.addEventListener('click', () => {

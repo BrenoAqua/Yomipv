@@ -86,6 +86,7 @@ body.visible #history-container {
   cursor: pointer;
   padding: 0;
   transition: color 0.15s;
+  white-space: nowrap;
 }
 
 .header-buttons button:hover, .header-buttons button.active {
