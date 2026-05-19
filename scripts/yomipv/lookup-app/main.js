@@ -110,7 +110,6 @@ function createHistoryWindow() {
   historyWindow.loadFile('history.html');
 }
 
-// Show settings window
 function createSettingsWindow() {
   if (settingsWindow) {
     settingsWindow.show();
@@ -123,6 +122,7 @@ function createSettingsWindow() {
     height: 700,
     frame: false,
     show: false,
+    alwaysOnTop: true,
     icon: appIconPath,
     webPreferences: {
       nodeIntegration: true,
@@ -130,6 +130,8 @@ function createSettingsWindow() {
     }
   });
 
+  settingsWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+  settingsWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   settingsWindow.loadFile('settings.html');
   settingsWindow.once('ready-to-show', () => settingsWindow.show());
   settingsWindow.on('closed', () => settingsWindow = null);

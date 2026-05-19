@@ -182,6 +182,7 @@ const fieldConfigs = {
     { key: 'colorizer_enabled', label: 'Enable Colorizer', type: 'checkbox' },
     { key: 'selector_colorize_words', label: 'Colorize Words', type: 'checkbox' },
     { key: 'selector_colorize_underline', label: 'Colorize Underline', type: 'checkbox' },
+    { key: 'selector_colorize_opacity', label: 'Colorize Underline Opacity', type: 'number', desc: 'Opacity of colorized underlines from 0 to 100' },
     
     { type: 'header', label: 'Lookup Settings' },
     { key: 'selector_lookup_on_hover', label: 'Open Lookup on hover', type: 'checkbox' },

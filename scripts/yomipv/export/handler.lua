@@ -422,6 +422,9 @@ function Handler:handle_selector_result(context, selected_token)
 
 	local AnkiDB = require("lib.anki_db")
 	AnkiDB.add_word(exact_text, "New", 0)
+	if effective_expr and effective_expr ~= "" then
+		AnkiDB.add_word(effective_expr, "New", 0)
+	end
 	if self.current_tokens then
 		self:on_current_tokens_ready(self.current_tokens)
 	end
@@ -845,16 +848,7 @@ function Handler:update_range_async(context, direction, completion_callback)
 				-- Keep colors in sync with tokens after changes
 				if self.config.selector_colorize_words and self.deps.selector.style then
 					local AnkiDB = require("lib.anki_db")
-					local updated_colors = {}
-					for i, token in ipairs(self.deps.selector.tokens) do
-						if token.headwords then
-							local color = AnkiDB.get_word_color(token.headwords)
-							if color then
-								updated_colors[i] = color
-							end
-						end
-					end
-					self.deps.selector.style.word_colors = updated_colors
+					self.deps.selector.style.word_colors = AnkiDB.get_tokens_colors(self.deps.selector.tokens)
 					self.deps.selector:render()
 				end
 
@@ -895,18 +889,9 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 	local word_colors
 	if self.config.selector_colorize_words and tokens then
 		local AnkiDB = require("lib.anki_db")
-		word_colors = {}
+		word_colors = AnkiDB.get_tokens_colors(tokens)
 		local color_count = 0
-		for i, token in ipairs(tokens) do
-			if token.headwords then
-				local color = AnkiDB.get_word_color(token.headwords)
-				if color then
-					word_colors[i] = color
-					color_count = color_count + 1
-				end
-			end
-		end
-		msg.info("handler: build_selector_style - found " .. color_count .. " word colors out of " .. #tokens .. " tokens")
+		for _ in pairs(word_colors) do color_count = color_count + 1 end
 	end
 	return {
 		font_size = self.config.selector_font_size,
@@ -915,6 +900,7 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		selection_color = self.config.selector_selection_color,
 		selection_underline = self.config.selector_selection_underline,
 		colorize_underline = self.config.selector_colorize_underline,
+		colorize_opacity = self.config.selector_colorize_opacity,
 		underline_thickness = self.config.selector_underline_thickness,
 		underline_offset = self.config.selector_underline_offset,
 		border_color = self.config.selector_border_color,
