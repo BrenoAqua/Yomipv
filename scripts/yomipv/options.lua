@@ -264,6 +264,7 @@ local default_options = {
 	-- Keybindings
 	key_sub_seek_next = "Alt+RIGHT",
 	key_sub_seek_prev = "Alt+LEFT",
+	key_sub_replay = "r",
 	key_secondary_sub_next = "Ctrl+j",
 	key_secondary_sub_prev = "Ctrl+J",
 	key_sync_subtitles = "Ctrl+s",

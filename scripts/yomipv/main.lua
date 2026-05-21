@@ -203,6 +203,40 @@ mp.register_script_message("yomipv-dictionary-selected", function(text)
 	if handler then handler:set_selected_dictionary(text) end
 end)
 
+local replay_end_pos = -1
+
+local function check_sub_end(_, val)
+	if val and val >= replay_end_pos then
+		mp.set_property_bool("pause", true)
+		mp.unobserve_property(check_sub_end)
+		replay_end_pos = -1
+	end
+end
+
+local function sub_replay()
+	local sub_start = mp.get_property_number("sub-start", -1)
+	local sub_end = mp.get_property_number("sub-end", -1)
+	local sub_delay = mp.get_property_number("sub-delay", 0)
+	local fps = mp.get_property_number("container-fps", 23.976)
+	local frame_duration = 1 / fps
+
+	if sub_start >= 0 and sub_end >= 0 then
+		local start_pos = sub_start + sub_delay
+		local end_pos = sub_end + sub_delay
+
+		-- Target the last frame by subtracting 1.5 frame durations to account for observer polling
+		replay_end_pos = end_pos - (frame_duration * 1.5)
+		if replay_end_pos <= start_pos then
+			replay_end_pos = end_pos
+		end
+
+		mp.commandv("seek", start_pos, "absolute")
+		mp.set_property_bool("pause", false)
+		mp.unobserve_property(check_sub_end)
+		mp.observe_property("time-pos", "number", check_sub_end)
+	end
+end
+
 function register_keybindings()
 	local bindings = {
 		{ config.key_load_yomipv, "yomipv-load", load_yomipv },
@@ -223,6 +257,7 @@ function register_keybindings()
 			end },
 			{ config.key_sub_seek_next, "yomipv-sub-seek-next", function() mp.commandv("sub-seek", "1") end },
 			{ config.key_sub_seek_prev, "yomipv-sub-seek-prev", function() mp.commandv("sub-seek", "-1") end },
+			{ config.key_sub_replay, "yomipv-sub-replay", sub_replay },
 			{ config.key_secondary_sub_next, "yomipv-secondary-sub-next", function() SecondarySid.cycle_track(1) end },
 			{ config.key_secondary_sub_prev, "yomipv-secondary-sub-prev", function() SecondarySid.cycle_track(-1) end },
 			{ config.key_update, "yomipv-update", function() Updater.launch(config) end },

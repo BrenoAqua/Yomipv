@@ -294,6 +294,7 @@ const fieldConfigs = {
     { type: 'header', label: 'Keybindings' },
     { key: 'key_sub_seek_next', label: 'Seek Next', type: 'keybind', desc: 'Jump to next subtitle line' },
     { key: 'key_sub_seek_prev', label: 'Seek Previous', type: 'keybind', desc: 'Jump to previous subtitle line' },
+    { key: 'key_sub_replay', label: 'Replay Subtitle', type: 'keybind', desc: 'Replay the currently paused subtitle line and pause again' },
     { key: 'key_secondary_sub_next', label: 'Next Secondary Sub', type: 'keybind' },
     { key: 'key_secondary_sub_prev', label: 'Previous Secondary Sub', type: 'keybind' },
     { key: 'key_sync_subtitles', label: 'Sync Subtitles', type: 'keybind', desc: 'Sync primary subtitle timing to secondary if languages match' }

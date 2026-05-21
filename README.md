@@ -113,6 +113,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - Seek to a specific subtitle's timestamp by clicking on it (when selector is closed)
   - Click on previous/next lines to expand the subtitle lines (when selector is open)
   - **`Alt+LEFT`** / **`Alt+RIGHT`**: Seek to the previous/next subtitle
+  - **`r`**: Replay the current subtitle line from the beginning and pause at the last frame
   - Press **`x`** to clear subtitle history (when the history panel is open)
   - Includes buttons to toggle picture animation and clear subtitle history
 
@@ -139,6 +140,9 @@ Opens a popup window powered by your Yomitan dictionaries, showing definitions, 
     - **Requirement**: Press **`Shift+B`** to build/sync the local Anki database first before these statuses can be displayed for your existing collection
   - **Instant Feedback**: When you create a card, the word is immediately added to the local database and highlighted (red) in the current subtitle
   - See [docs/colorizer.md](docs/colorizer.md) for full details
+
+- **Subtitle Replay**
+  - **`r`**: Replay the current subtitle line from the beginning and pause at the last frame, useful for re-listening to a line for practice
 
 - **Subtitle Sync**
   - Align primary Japanese subtitles to secondary translation timings to fix desynced tracks
