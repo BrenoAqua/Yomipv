@@ -4,6 +4,8 @@ local mp = require("mp")
 local utils = require("mp.utils")
 local msg = require("mp.msg")
 local JSONFormat = require("lib.json_format")
+local Conjugations = require("lib.conjugations")
+local options = require("options")
 
 local AnkiDB = {}
 
@@ -87,56 +89,194 @@ local function word_color(entry)
 	return nil
 end
 
-local function is_term_match(hw)
-	if type(hw) ~= "table" then return true end
-	if not hw.sources or #hw.sources == 0 then return true end
-	for _, src in ipairs(hw.sources) do
-		if src.matchSource == "term" then
-			return true
-		end
+local function each_deconjugated_term(term, callback)
+	if type(term) ~= "string" or term == "" then
+		return nil
 	end
-	return false
-end
 
-local function find_clean_term(db, term)
-	if type(term) ~= "string" or term == "" then return nil, nil end
-	local entry = db[term]
-	if entry then return entry, term end
-
-	local particles = { "が", "の", "に", "を", "と", "は", "も", "で", "へ", "から", "より" }
-	for _, p in ipairs(particles) do
-		if term:sub(1, #p) == p then
-			local stripped = term:sub(#p + 1)
-			if #stripped > 3 then
-				local stripped_entry = db[stripped]
-				if stripped_entry then return stripped_entry, stripped end
+	for _, p in ipairs(Conjugations.noun_suffixes) do
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1))
+			if #stripped >= 3 then
+				local r1, r2, r3 = callback(stripped, #p)
+				if r1 ~= nil then return r1, r2, r3 end
 			end
 		end
 	end
-	return nil, nil
+
+	for _, adj in ipairs(Conjugations.adj_endings) do
+		local p = adj.ending
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1)) .. adj.rep
+			if #stripped >= 3 then
+				-- よい is the literary root of いい; normalize to the common card form.
+				if stripped == "よい" then
+					stripped = "いい"
+				end
+				local r1, r2, r3 = callback(stripped, 0)
+				if r1 ~= nil then return r1, r2, r3 end
+			end
+		end
+	end
+
+	for _, p in ipairs(Conjugations.na_adj_endings) do
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1))
+			if #stripped >= 3 then
+				local r1, r2, r3 = callback(stripped, 0)
+				if r1 ~= nil then return r1, r2, r3 end
+			end
+		end
+	end
+
+	for _, verb in ipairs(Conjugations.verb_endings) do
+		local p = verb.ending
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1)) .. verb.rep
+			if #stripped >= 3 then
+				local r1, r2, r3 = callback(stripped, 0)
+				if r1 ~= nil then return r1, r2, r3 end
+			end
+		end
+	end
+
+	return nil
+end
+
+local function find_clean_term(db, term)
+	if type(term) ~= "string" or term == "" then return nil, nil, 0 end
+	local entry = db[term]
+	if entry then return entry, term, 0 end
+
+	local stripped_entry, stripped, stripped_bytes = each_deconjugated_term(term, function(base, base_stripped_bytes)
+		local entry_for_base = db[base]
+		if entry_for_base then
+			return entry_for_base, base, base_stripped_bytes
+		end
+	end)
+	if stripped_entry then
+		return stripped_entry, stripped, stripped_bytes
+	end
+
+	return nil, nil, 0
 end
 
 local function resolve_term_color(db, hw)
 	if type(hw) == "string" then
 		if hw ~= "" then
-			local entry, matched = find_clean_term(db, hw)
-			if entry then return word_color(entry), matched end
+			local entry, matched, stripped = find_clean_term(db, hw)
+			if entry then return word_color(entry), matched, stripped, hw end
 		end
 	elseif type(hw) == "table" then
 		local term = hw.term or hw.expression
+		local hw_reading = hw.reading or term
 		if type(term) == "string" and term ~= "" then
-			if is_term_match(hw) then
-				local entry, matched = find_clean_term(db, term)
-				if entry then return word_color(entry), matched end
-			end
+			local entry, matched, stripped = find_clean_term(db, term)
+			if entry then return word_color(entry), matched, stripped, hw_reading end
 		end
 
 		for _, v in ipairs(hw) do
-			local color, found_term = resolve_term_color(db, v)
-			if color then return color, found_term end
+			local color, found_term, stripped, found_reading = resolve_term_color(db, v)
+			if color then return color, found_term, stripped, found_reading end
 		end
 	end
 	return nil
+end
+
+local function contains_kanji(text)
+	if type(text) ~= "string" or text == "" then return false end
+	local i = 1
+	local len = #text
+	while i <= len do
+		local b1 = text:byte(i)
+		if b1 >= 0xE3 and b1 <= 0xEF then
+			local b2 = text:byte(i + 1)
+			-- Main Kanji block: U+4E00..U+9FFF (E4 B8 80 .. E9 BF BF)
+			if b1 >= 0xE4 and b1 <= 0xE9 then
+				return true
+			-- Extension A: U+3400..U+4DBF (E3 90 80 .. E4 B6 BF)
+			elseif b1 == 0xE3 and b2 and b2 >= 0x90 then
+				return true
+			-- CJK Compatibility Ideographs: U+F900..U+FAFF (EF A4 80 .. EF AB BF)
+			elseif b1 == 0xEF and b2 and b2 >= 0xA4 and b2 <= 0xAB then
+				return true
+			end
+			i = i + 3
+		elseif b1 >= 0xF0 then
+			-- 4-byte kanji Extensions
+			return true
+		elseif b1 >= 0xE0 then
+			i = i + 3
+		elseif b1 >= 0xC0 then
+			i = i + 2
+		else
+			i = i + 1
+		end
+	end
+	return false
+end
+
+local function is_single_kana_string(text)
+	if type(text) ~= "string" or #text ~= 3 then return false end
+	local b1, b2 = text:byte(1, 2)
+	return b1 == 0xE3 and (b2 == 0x81 or b2 == 0x82 or b2 == 0x83)
+end
+
+local function utf8_char_len_at(text, byte_index)
+	local byte = text:byte(byte_index)
+	if not byte then return 1 end
+	if byte >= 0xC0 then
+		if byte >= 0xE0 then
+			if byte >= 0xF0 then return 4 end
+			return 3
+		end
+		return 2
+	end
+	return 1
+end
+
+local function matches_base_form(term, target)
+	if type(term) ~= "string" or term == "" or type(target) ~= "string" or target == "" then
+		return false
+	end
+
+	if term == target then
+		return true
+	end
+
+	return each_deconjugated_term(term, function(base)
+		if base == target then
+			return true
+		end
+	end) == true
+end
+
+local function token_matches_headword(token_text, token_reading, matched_term, matched_reading)
+	if type(token_text) ~= "string" or token_text == "" then
+		return false
+	end
+
+	local reading = (type(token_reading) == "string" and token_reading ~= "") and token_reading or token_text
+	local headword_reading = (type(matched_reading) == "string" and matched_reading ~= "")
+		and matched_reading or matched_term
+
+	if token_text == matched_term then
+		return true
+	end
+
+	if reading == headword_reading then
+		return true
+	end
+
+	if matches_base_form(token_text, matched_term) then
+		return true
+	end
+
+	if matches_base_form(reading, headword_reading) then
+		return true
+	end
+
+	return false
 end
 
 -- Returns ASS-formatted BGR color or nil for any headword match in the DB
@@ -152,110 +292,170 @@ function AnkiDB.get_word_color(headwords)
 	return nil
 end
 
-local function get_token_reps(token)
-	local reps = {}
-	local seen = {}
-	local function add_rep(r)
-		if type(r) == "string" and r ~= "" and not seen[r] then
-			seen[r] = true
-			table.insert(reps, r)
-		end
-	end
-	add_rep(token.text)
-	local function collect_hw(hw)
-		if type(hw) == "table" then
-			local term = hw.term or hw.expression
-			add_rep(term)
-			for _, v in ipairs(hw) do
-				collect_hw(v)
-			end
-		elseif type(hw) == "string" then
-			add_rep(hw)
-		end
-	end
-	collect_hw(token.headwords)
-	return reps
-end
-
-local function generate_combinations(reps_list, idx, current_str, results)
-	if idx > #reps_list then
-		results[current_str] = true
-		return
-	end
-	for _, rep in ipairs(reps_list[idx]) do
-		generate_combinations(reps_list, idx + 1, current_str .. rep, results)
-	end
-end
-
 function AnkiDB.get_tokens_colors(tokens)
 	local db = load_db()
 	if not db or not tokens then return {} end
 
 	local colors = {}
 	local n = #tokens
-	local i = 1
-	while i <= n do
-		local matched_len = nil
+
+	local full_text = ""
+	local token_starts = {}
+	local token_ends = {}
+	for i = 1, n do
+		token_starts[i] = #full_text + 1
+		full_text = full_text .. (tokens[i].text or "")
+		token_ends[i] = #full_text
+	end
+
+	local b = 1
+	local current_token_idx = 1
+
+	local function get_token_idx(byte_offset)
+		while current_token_idx <= n and byte_offset > token_ends[current_token_idx] do
+			current_token_idx = current_token_idx + 1
+		end
+		if current_token_idx <= n and byte_offset >= token_starts[current_token_idx] then
+			return current_token_idx
+		end
+		return nil
+	end
+
+	local intervals = {}
+
+	while b <= #full_text do
+		local matched_len_bytes = nil
 		local matched_color = nil
 		local matched_term = nil
 
-		for len = math.min(6, n - i + 1), 2, -1 do
-			local reps_list = {}
-			local has_selectable = false
-			for k = i, i + len - 1 do
-				local reps = get_token_reps(tokens[k])
-				if #reps > 0 then
-					table.insert(reps_list, reps)
-				end
-				if tokens[k].is_term then
-					has_selectable = true
-				end
-			end
+		local t_idx = get_token_idx(b)
 
-			if #reps_list == len and has_selectable then
-				local combinations = {}
-				generate_combinations(reps_list, 1, "", combinations)
+		if t_idx and b == token_starts[t_idx] then
+			for len = math.min(6, n - t_idx + 1), 2, -1 do
+				local has_selectable = false
+				local combined = ""
+				for k = t_idx, t_idx + len - 1 do
+					combined = combined .. (tokens[k].text or "")
+					if tokens[k].is_term then has_selectable = true end
+				end
 
-				for comb in pairs(combinations) do
-					local entry, matched = find_clean_term(db, comb)
-					if entry and matched == comb then
-						local color = word_color(entry)
-						if color then
-							matched_len = len
-							matched_color = color
-							matched_term = matched
-							break
+				if has_selectable and combined ~= "" then
+					local skip = options.colorizer_ignore_kana_only and not contains_kanji(combined)
+					if skip and db[combined] then skip = false end
+
+					if not skip then
+						local entry, matched, stripped = find_clean_term(db, combined)
+						if entry then
+							local color = word_color(entry)
+							if color then
+								matched_len_bytes = #combined - (stripped or 0)
+								matched_color = color
+								matched_term = matched
+								break
+							end
 						end
 					end
 				end
 			end
 
-			if matched_len then
-				break
+			if not matched_len_bytes then
+				local token = tokens[t_idx]
+				local text_is_single_kana = is_single_kana_string(token.text or "")
+				local skip_kana = options.colorizer_ignore_kana_only and not contains_kanji(token.text or "")
+				if skip_kana and token.text and token.text ~= "" and db[token.text] then
+					skip_kana = false
+				end
+
+				if token.headwords and not text_is_single_kana and not skip_kana then
+					local color, term_matched, stripped_bytes, hw_reading = resolve_term_color(db, token.headwords)
+					if color then
+						local txt = token.text or ""
+						local tok_reading = (token.reading ~= "" and token.reading) or txt
+						if token_matches_headword(txt, tok_reading, term_matched, hw_reading) then
+							matched_len_bytes = #txt - (stripped_bytes or 0)
+							matched_color = color
+							matched_term = term_matched
+						end
+					end
+				end
 			end
 		end
 
-		if matched_len then
-			for k = i, i + matched_len - 1 do
-				colors[k] = { color = matched_color, term = matched_term }
-			end
-			i = i + matched_len
-		else
-			local token = tokens[i]
-			if token.headwords then
-				local color, term = resolve_term_color(db, token.headwords)
-				if color then
-					colors[i] = { color = color, term = term }
+		if not matched_len_bytes then
+			local best_match_bytes = nil
+			local best_color = nil
+			local best_term = nil
+
+			local char_count = 0
+			local j = b
+			while j <= #full_text and char_count < 20 do
+				local char_len = utf8_char_len_at(full_text, j)
+				j = j + char_len
+				char_count = char_count + 1
+
+				local sub = full_text:sub(b, j - 1)
+				local is_single_kana = #full_text > 3 and is_single_kana_string(sub)
+
+				local sub_is_kana_only = options.colorizer_ignore_kana_only and not contains_kanji(sub)
+				if not is_single_kana then
+					local entry, matched, stripped_bytes = find_clean_term(db, sub)
+					if entry and (matched == sub or stripped_bytes == 0) then
+						if not (sub_is_kana_only and matched ~= sub) then
+							local color = word_color(entry)
+							if color then
+								best_match_bytes = j - b
+								best_color = color
+								best_term = matched
+							end
+						end
+					end
 				end
 			end
-			i = i + 1
+
+			if best_match_bytes then
+				matched_len_bytes = best_match_bytes
+				matched_color = best_color
+				matched_term = best_term
+			end
+		end
+
+		if matched_len_bytes and matched_len_bytes > 0 then
+			table.insert(intervals, {
+				start_byte = b,
+				end_byte = b + matched_len_bytes - 1,
+				color = matched_color,
+				term = matched_term
+			})
+			b = b + matched_len_bytes
+		else
+			b = b + utf8_char_len_at(full_text, b)
+		end
+	end
+
+	for _, inv in ipairs(intervals) do
+		for i = 1, n do
+			if token_ends[i] >= inv.start_byte and token_starts[i] <= inv.end_byte then
+				local t_start = math.max(inv.start_byte, token_starts[i])
+				local t_end = math.min(inv.end_byte, token_ends[i])
+
+				local rel_start = t_start - token_starts[i] + 1
+				local rel_end = t_end - token_starts[i] + 1
+
+				if not colors[i] then colors[i] = {} end
+				table.insert(colors[i], {
+					start_byte = rel_start,
+					end_byte = rel_end,
+					color = inv.color,
+					term = inv.term
+				})
+			end
 		end
 	end
 
 	return colors
 end
 
--- Forces a reload on next access (call after anki_words.json is regenerated)
+-- Forces a reload on next access
 function AnkiDB.reload()
 	_db = nil
 	_loaded = false

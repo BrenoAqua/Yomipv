@@ -34,6 +34,7 @@ const fieldConfigs = {
   general: [
     { type: 'header', label: 'Startup' },
     { key: 'auto_load', label: 'Auto-load Yomipv', type: 'checkbox' },
+    { key: 'osd_messages', label: 'Show OSD Messages', type: 'checkbox' },
     { type: 'header', label: 'Profiles' },
     { type: 'profiles-manager' },
     { type: 'header', label: 'Keybindings' },
@@ -128,7 +129,7 @@ const fieldConfigs = {
         { label: 'jpg', value: 'jpg' }
       ] 
     },
-    { key: 'picture_static_quality', label: 'Image Quality', type: 'number', desc: '1-100' },
+    { key: 'picture_static_quality', label: 'Image Quality', type: 'number', range: { min: 1, max: 100, step: 1 } },
     { key: 'picture_static_width', label: 'Static Width', type: 'number' },
     { key: 'picture_static_offset', label: 'Static Offset', type: 'number' },
 
@@ -148,8 +149,12 @@ const fieldConfigs = {
     
     { type: 'header', label: 'Advanced Codec Settings' },
     { key: 'picture_webp_lossless', label: 'WebP Lossless', type: 'checkbox' },
-    { key: 'picture_webp_compression', label: 'WebP Compression', type: 'number', desc: '0-6' },
-    { key: 'picture_avif_cpu_used', label: 'AVIF CPU Used', type: 'number', desc: '0-8' },
+    { key: 'picture_webp_compression', label: 'WebP Compression', type: 'number', range: { min: 0, max: 6, step: 1 } },
+    { key: 'picture_avif_cpu_used', label: 'AVIF CPU Used', type: 'number', range: { min: 0, max: 8, step: 1 } },
+
+    { type: 'header', label: 'Keybindings' },
+    { key: 'key_toggle_picture_animated', label: 'Toggle Picture Animated', type: 'keybind' },
+    { key: 'key_toggle_picture_timestamp_source', label: 'Toggle Picture Timestamp Source', type: 'keybind' },
   ],
 
   audio: [
@@ -167,7 +172,26 @@ const fieldConfigs = {
     { key: 'audio_end_offset', label: 'Audio End Offset', type: 'number' },
     { type: 'header', label: 'Misc' },
     { key: 'audio_match_volume', label: 'Match Volume', type: 'checkbox' },
-    { key: 'filename_show_ms', label: 'MS in Filenames', type: 'checkbox' }
+    { key: 'filename_show_ms', label: 'Milliseconds in Filenames', type: 'checkbox' }
+  ],
+
+  lookup: [
+    { type: 'header', label: 'Lookup Behavior' },
+    { key: 'selector_lookup_on_hover', label: 'Open Lookup on hover', type: 'checkbox' },
+    { key: 'selector_lookup_on_navigation', label: 'Open Lookup on navigation', type: 'checkbox' },
+    { key: 'selector_lookup_delay', label: 'Lookup Delay', type: 'number', desc: 'Delay before lookup opens on hover/navigation' },
+    { key: 'lookup_show_frequencies', label: 'Show Frequencies', type: 'checkbox' },
+    { key: 'lookup_show_pitch_accents', label: 'Show Pitch Accents', type: 'checkbox' },
+    { key: 'prioritize_kanji_match', label: 'Prioritize Kanji', type: 'checkbox' },
+    { key: 'prioritize_hiragana_match', label: 'Prioritize Hiragana', type: 'checkbox' },
+
+    { type: 'header', label: 'Lookup Appearance' },
+    { key: 'lookup_theme', label: 'Theme', type: 'select',
+      options: [
+        { label: 'Dark', value: 'dark' },
+        { label: 'Light', value: 'light' }
+      ]
+    }
   ],
 
   selector: [
@@ -177,31 +201,8 @@ const fieldConfigs = {
     { key: 'selector_navigation_delay', label: 'Navigation Delay', type: 'number', desc: 'Input delay between repeated navigation actions' },
     { key: 'selector_trigger_on_mouse_move', label: 'Mouse Trigger', type: 'checkbox' },
     { key: 'selector_trigger_mouse_idle_time', label: 'Mouse Idle Time', type: 'number', desc: 'Seconds before trigger' },
-
-    { type: 'header', label: 'Colorizer' },
-    { key: 'colorizer_enabled', label: 'Enable Colorizer', type: 'checkbox' },
-    { key: 'selector_colorize_words', label: 'Colorize Words', type: 'checkbox' },
-    { key: 'selector_colorize_underline', label: 'Colorize Underline', type: 'checkbox' },
-    { key: 'selector_colorize_opacity', label: 'Colorize Underline Opacity', type: 'number', desc: 'Opacity of colorized underlines from 0 to 100' },
-    
-    { type: 'header', label: 'Lookup Settings' },
-    { key: 'selector_lookup_on_hover', label: 'Open Lookup on hover', type: 'checkbox' },
-    { key: 'selector_lookup_on_navigation', label: 'Open Lookup on navigation', type: 'checkbox' },
-    { key: 'selector_lookup_delay', label: 'Lookup Delay', type: 'number', desc: 'Delay before lookup opens on hover/navigation' },
     { key: 'selector_mora_hover', label: 'Mora Hover', type: 'checkbox' },
     { key: 'selector_mora_navigation', label: 'Mora Navigation', type: 'checkbox' },
-    { key: 'lookup_show_frequencies', label: 'Show Frequencies', type: 'checkbox' },
-    { key: 'lookup_show_pitch_accents', label: 'Show Pitch Accents', type: 'checkbox' },
-    { key: 'prioritize_kanji_match', label: 'Prioritize Kanji', type: 'checkbox' },
-    { key: 'prioritize_hiragana_match', label: 'Prioritize Hiragana', type: 'checkbox' },
-
-    { type: 'header', label: 'Appearance' },
-    { key: 'lookup_theme', label: 'Theme', type: 'select',
-      options: [
-        { label: 'Dark', value: 'dark' },
-        { label: 'Light', value: 'light' }
-      ]
-    },
 
     { type: 'header', label: 'Typography' },
     { key: 'selector_font_name', label: 'Selector Font', type: 'text' },
@@ -228,7 +229,6 @@ const fieldConfigs = {
     { key: 'selector_max_width_factor', label: 'Max Width Factor', type: 'number', desc: '0.0 - 1.0' },
 
     { type: 'header', label: 'Keybindings' },
-    { key: 'key_toggle_colorizer', label: 'Toggle Colorizer', type: 'keybind' },
     { key: 'key_open_selector', label: 'Open Selector', type: 'keybind' },
     { key: 'key_selector_confirm', label: 'Selector Confirm', type: 'keybind' },
     { key: 'key_selector_cancel', label: 'Selector Cancel', type: 'keybind' },
@@ -245,9 +245,46 @@ const fieldConfigs = {
     { key: 'key_append_mode', label: 'Append Mode', type: 'keybind' },
     { key: 'key_set_timing_start', label: 'Set Timing Start', type: 'keybind' },
     { key: 'key_set_timing_end', label: 'Set Timing End', type: 'keybind' },
-    { key: 'key_clear_timings', label: 'Clear Timings', type: 'keybind' },
-    { key: 'key_build_ankidb', label: 'Build AnkiDB', type: 'keybind' },
-    { key: 'key_toggle_picture_animated', label: 'Toggle Picture Animated', type: 'keybind' }
+    { key: 'key_clear_timings', label: 'Clear Timings', type: 'keybind' }
+  ],
+
+  colorizer: [
+    { type: 'header', label: 'Colorizer Behavior' },
+    {
+      key: 'colorizer_enabled',
+      label: 'Replace MPV Subtitles with Colorized Subtitles',
+      type: 'checkbox',
+      desc: 'Hides the normal MPV subtitle renderer and shows Yomipv subtitle text instead so colorizer styling can be displayed.'
+    },
+    {
+      key: 'selector_colorize_words',
+      label: 'Enable Word Coloring',
+      type: 'checkbox',
+      desc: 'Master toggle for word coloring. Applies Anki-based colors to matching words in both Selector and Colorizer subtitles'
+    },
+    {
+      key: 'colorizer_ignore_kana_only',
+      label: 'Skip Kana-only Words',
+      type: 'checkbox',
+      desc: 'Kana-only words with matching database entries are still colorized. This only skips kana-only words that have no database match'
+    },
+    {
+      key: 'selector_colorize_underline',
+      label: 'Colorize Underline',
+      type: 'checkbox',
+      desc: 'Uses colored underlines instead of word coloring. When enabled, the colors from "Enable Word Coloring" are applied to underlines beneath matching words rather than to the words themselves'
+    },
+    {
+      key: 'selector_colorize_opacity',
+      label: 'Colorize Underline Opacity',
+      type: 'number',
+      desc: 'Opacity of colorized underlines',
+      range: { min: 0, max: 100, step: 1 }
+    },
+
+    { type: 'header', label: 'Keybindings' },
+    { key: 'key_toggle_colorizer', label: 'Toggle Colorizer', type: 'keybind' },
+    { key: 'key_build_ankidb', label: 'Build AnkiDB', type: 'keybind' }
   ],
 
   history: [
@@ -301,13 +338,13 @@ const fieldConfigs = {
   ],
 
   anilist: [
-    { key: 'anilist_enabled', label: 'Enable AniList', type: 'checkbox' },
-    { key: 'anilist_token', label: 'AniList Token', type: 'password' },
-    { key: 'anilist_update_thresh_percent', label: 'AniList Threshold', type: 'number', desc: '80-100' },
-    { key: 'anilist_show_notifications', label: 'AniList OSD', type: 'checkbox' },
+    { key: 'anilist_enabled', label: 'Enable AniList', type: 'checkbox', desc: 'Track watch progress with AniList while you watch' },
+    { key: 'anilist_token', label: 'AniList Token', type: 'password', desc: 'Access token used to authenticate AniList updates' },
+    { key: 'anilist_update_thresh_percent', label: 'AniList Threshold', type: 'number', desc: 'Episode completion percentage required before marking progress', range: { min: 0, max: 100, step: 1 } },
+    { key: 'anilist_show_notifications', label: 'AniList OSD', type: 'checkbox', desc: 'Show on-screen messages for AniList status and progress updates' },
 
     { type: 'header', label: 'Keybindings' },
-    { key: 'key_anilist_auth', label: 'AniList Auth', type: 'keybind' }
+    { key: 'key_anilist_auth', label: 'AniList Auth', type: 'keybind', desc: 'Start the AniList authentication flow' }
   ],
 
   updater: [
@@ -317,10 +354,6 @@ const fieldConfigs = {
 
     { type: 'header', label: 'Keybindings' },
     { key: 'key_update', label: 'Update', type: 'keybind' }
-  ],
-
-  mpv: [
-    { key: 'osd_messages', label: 'Show OSD Messages', type: 'checkbox' }
   ]
 };
 
@@ -343,15 +376,19 @@ function renderFields() {
         fieldEl.className = 'profiles-manager-container';
         fieldEl.innerHTML = `
           <div id="profile-list" class="profile-list"></div>
-          <div class="profile-create">
-            <label for="new-profile-name">Create profile</label>
-            <div class="input-row">
-              <input id="new-profile-name" type="text" spellcheck="false">
-              <button id="btn-create-profile" class="btn-primary">Create</button>
+          <div class="profile-card profile-create">
+            <div class="profile-copy">
+              <label class="profile-name" for="new-profile-name">Create profile</label>
+              <p class="profile-meta">
+                Creates <code>script-opts/yomipv_<em>&lt;name&gt;</em>.conf</code> as a copy of the current config
+              </p>
             </div>
-            <p class="hint">
-              Creates <code>script-opts/yomipv_<em>&lt;name&gt;</em>.conf</code> as a copy of the current config.
-            </p>
+            <div class="profile-actions profile-create-actions">
+              <div class="input-row">
+                <input id="new-profile-name" type="text" spellcheck="false">
+                <button id="btn-create-profile" class="btn-primary">Create</button>
+              </div>
+            </div>
           </div>
         `;
         
@@ -376,11 +413,14 @@ function renderFields() {
         }, 0);
       } else if (conf.type === 'checkbox') {
         fieldEl.innerHTML = `
-          <div class="field-label"></div>
-          <div class="checkbox-container">
-            <input type="checkbox" id="field-${conf.key}">
+          <div class="field-copy">
+            <div class="field-label"></div>
+            <div class="field-desc"></div>
           </div>
-          <div class="field-desc"></div>
+          <label class="switch" for="field-${conf.key}">
+            <input type="checkbox" id="field-${conf.key}">
+            <span class="switch-slider"></span>
+          </label>
         `;
         const input = fieldEl.querySelector('input');
         input.checked = !!val;
@@ -390,11 +430,13 @@ function renderFields() {
         else fieldEl.querySelector('.field-desc').remove();
       } else if (conf.type === 'select') {
         fieldEl.innerHTML = `
-          <div class="field-label"></div>
+          <div class="field-copy">
+            <div class="field-label"></div>
+            <div class="field-desc"></div>
+          </div>
           <div class="field-input-row">
             <select id="field-${conf.key}"></select>
           </div>
-          <div class="field-desc"></div>
         `;
         const select = fieldEl.querySelector('select');
         conf.options.forEach(opt => {
@@ -408,13 +450,51 @@ function renderFields() {
         fieldEl.querySelector('.field-label').textContent = conf.label;
         if (conf.desc) fieldEl.querySelector('.field-desc').textContent = conf.desc;
         else fieldEl.querySelector('.field-desc').remove();
+      } else if (conf.type === 'number' && conf.range) {
+        fieldEl.innerHTML = `
+          <div class="field-copy">
+            <div class="field-label"></div>
+            <div class="field-desc"></div>
+          </div>
+          <div class="field-input-row range-input-row">
+            <input type="range" id="field-${conf.key}-range"
+              min="${conf.range.min}" max="${conf.range.max}" step="${conf.range.step || 1}">
+            <input type="number" class="range-number-input" id="field-${conf.key}"
+              min="${conf.range.min}" max="${conf.range.max}" step="${conf.range.step || 1}" spellcheck="false">
+          </div>
+        `;
+        const range = fieldEl.querySelector(`#field-${conf.key}-range`);
+        const input = fieldEl.querySelector(`#field-${conf.key}`);
+        const initial = (val !== undefined && val !== null && val !== '') ? Number(val) : conf.range.min;
+        range.value = initial;
+        input.value = initial;
+        range.oninput = (e) => {
+          input.value = e.target.value;
+        };
+        range.onchange = (e) => updateSetting(conf.key, Number(e.target.value));
+        input.oninput = (e) => {
+          range.value = e.target.value;
+        };
+        input.onblur = (e) => {
+          let next = Number(e.target.value);
+          if (Number.isNaN(next)) next = conf.range.min;
+          next = Math.min(conf.range.max, Math.max(conf.range.min, next));
+          input.value = next;
+          range.value = next;
+          updateSetting(conf.key, next);
+        };
+        fieldEl.querySelector('.field-label').textContent = conf.label;
+        if (conf.desc) fieldEl.querySelector('.field-desc').textContent = conf.desc;
+        else fieldEl.querySelector('.field-desc').remove();
       } else if (conf.type === 'keybind') {
         fieldEl.innerHTML = `
-          <div class="field-label"></div>
+          <div class="field-copy">
+            <div class="field-label"></div>
+            <div class="field-desc"></div>
+          </div>
           <div class="field-input-row">
             <input type="text" class="keybind-input" id="field-${conf.key}" readonly placeholder="Click to record...">
           </div>
-          <div class="field-desc"></div>
         `;
         const input = fieldEl.querySelector('input');
         input.value = (val !== undefined && val !== null) ? val : '';
@@ -474,11 +554,13 @@ function renderFields() {
         else fieldEl.querySelector('.field-desc').remove();
       } else {
         fieldEl.innerHTML = `
-          <div class="field-label"></div>
+          <div class="field-copy">
+            <div class="field-label"></div>
+            <div class="field-desc"></div>
+          </div>
           <div class="field-input-row">
             <input type="${conf.type}" id="field-${conf.key}" spellcheck="false">
           </div>
-          <div class="field-desc"></div>
         `;
         const input = fieldEl.querySelector('input');
         input.value = (val !== undefined && val !== null) ? val : '';
@@ -510,8 +592,12 @@ function renderProfiles(profiles) {
   const baseCard = document.createElement('div');
   baseCard.className = `profile-card ${activeProfile === 'default' ? 'active' : ''}`;
   baseCard.innerHTML = `
-    <div class="profile-name">Default (yomipv.conf)</div>
+    <div class="profile-copy">
+      <div class="profile-name">Default</div>
+      <div class="profile-meta">Uses <code>script-opts/yomipv.conf</code></div>
+    </div>
     <div class="profile-actions">
+      <span class="profile-status">${activeProfile === 'default' ? 'Active' : ''}</span>
       <button class="btn-primary btn-switch" ${activeProfile === 'default' ? 'disabled' : ''}>Switch</button>
     </div>
   `;
@@ -523,8 +609,12 @@ function renderProfiles(profiles) {
     const card = document.createElement('div');
     card.className = `profile-card ${activeProfile === name ? 'active' : ''}`;
     card.innerHTML = `
-      <div class="profile-name">${name}</div>
+      <div class="profile-copy">
+        <div class="profile-name">${name}</div>
+        <div class="profile-meta">Uses <code>script-opts/yomipv_${name}.conf</code></div>
+      </div>
       <div class="profile-actions">
+        <span class="profile-status">${activeProfile === name ? 'Active' : ''}</span>
         <button class="btn-primary btn-switch" ${activeProfile === name ? 'disabled' : ''}>Switch</button>
         <button class="btn-danger btn-delete">Delete</button>
       </div>

@@ -377,6 +377,11 @@ app.whenReady().then(() => {
           const data = JSON.parse(body);
           if (data.term) {
             console.log('[IPC] Lookup for:', data.term);
+            if (!appIsFocused && !isMainDevToolsOpen()) {
+              console.log('[IPC] Ignoring lookup while mpv is unfocused');
+              res.end('ok');
+              return;
+            }
             pendingHide = false;
             if (mainWindow) {
               mainWindow.webContents.send('lookup-term', data);
@@ -635,6 +640,10 @@ ipcMain.on('active-entry', (event, data) => {
 ipcMain.on('show-window', () => {
   if (mainWindow) {
     console.log('[IPC] show-window signal received');
+    if (!appIsFocused && !isMainDevToolsOpen()) {
+      console.log('[IPC] show-window ignored: mpv is unfocused');
+      return;
+    }
     pendingHide = false;
     if (!mainWindow.isVisible()) {
       console.log('[IPC] window is hidden, showing inactive');

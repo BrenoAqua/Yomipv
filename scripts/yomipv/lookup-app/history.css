@@ -56,7 +56,7 @@ body.visible #history-container {
   justify-content: space-between;
   align-items: center;
   background-color: var(--header-bg);
-  height: 40px;
+  min-height: 40px;
   padding: 0 14px;
   border-radius: var(--radius) var(--radius) 0 0;
   font-weight: bold;
@@ -71,12 +71,13 @@ body.visible #history-container {
   line-height: 40px;
 }
 
-.header-buttons {
+.header-actions {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
 }
 
-.header-buttons button {
+.header-actions button {
   background: none;
   border: none;
   color: #dddddd;
@@ -85,16 +86,91 @@ body.visible #history-container {
   font-size: 14px;
   cursor: pointer;
   padding: 0;
-  transition: color 0.15s;
+  transition: color 0.15s, background-color 0.15s;
   white-space: nowrap;
 }
 
-.header-buttons button:hover, .header-buttons button.active {
+.header-actions button:hover,
+.header-actions button.active {
   color: #ffffff;
 }
 
+.header-dropdown {
+  position: relative;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+#history-menu-toggle,
 #open-settings {
-  font-size: 18px !important;
+  min-width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+#history-menu-toggle {
+  padding: 0;
+}
+
+.menu-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+}
+
+.menu-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background-color: currentColor;
+  display: block;
+}
+
+#history-menu-toggle:hover,
+#history-menu-toggle.active,
+#open-settings:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+#open-settings {
+  font-size: 18px;
+}
+
+.history-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 154px;
+  padding: 6px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-color-hex), #181818 40%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 20;
+}
+
+.history-menu button {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  text-align: left;
+  letter-spacing: 0.6px;
+}
+
+.history-menu button:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 #history-scroll-clip {

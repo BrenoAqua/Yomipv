@@ -359,6 +359,17 @@ end)
 mp.register_script_message("yomipv-delete-profile", function(name)
 	local ok, err = Profiles.delete(name)
 	if ok then
+		if config.current_profile == name then
+			local switched, switch_err = Profiles.load("default", config, config.defaults)
+			if switched then
+				config.save("current_profile", "default")
+				if handler then handler:sync_state() end
+				register_keybindings()
+				send_to_lookup_app("settings-data", { config = get_clean_config() })
+			else
+				msg.warn("Failed to switch to default profile after deletion: " .. tostring(switch_err))
+			end
+		end
 		Player.notify("Profile deleted: " .. name, "info", 2)
 		local list = Profiles.list()
 		send_to_lookup_app("profile-list-data", list)
