@@ -98,8 +98,8 @@ local function each_deconjugated_term(term, callback)
 		if #term > #p and term:sub(-#p) == p then
 			local stripped = term:sub(1, -(#p + 1))
 			if #stripped >= 3 then
-				local r1, r2, r3 = callback(stripped, #p)
-				if r1 ~= nil then return r1, r2, r3 end
+				local r1, r2, r3, r4 = callback(stripped, #p, "suffix_strip")
+				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
 	end
@@ -113,8 +113,8 @@ local function each_deconjugated_term(term, callback)
 				if stripped == "よい" then
 					stripped = "いい"
 				end
-				local r1, r2, r3 = callback(stripped, 0)
-				if r1 ~= nil then return r1, r2, r3 end
+				local r1, r2, r3, r4 = callback(stripped, 0, "inflection")
+				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
 	end
@@ -123,8 +123,8 @@ local function each_deconjugated_term(term, callback)
 		if #term > #p and term:sub(-#p) == p then
 			local stripped = term:sub(1, -(#p + 1))
 			if #stripped >= 3 then
-				local r1, r2, r3 = callback(stripped, 0)
-				if r1 ~= nil then return r1, r2, r3 end
+				local r1, r2, r3, r4 = callback(stripped, 0, "inflection")
+				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
 	end
@@ -134,8 +134,8 @@ local function each_deconjugated_term(term, callback)
 		if #term > #p and term:sub(-#p) == p then
 			local stripped = term:sub(1, -(#p + 1)) .. verb.rep
 			if #stripped >= 3 then
-				local r1, r2, r3 = callback(stripped, 0)
-				if r1 ~= nil then return r1, r2, r3 end
+				local r1, r2, r3, r4 = callback(stripped, 0, "inflection")
+				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
 	end
@@ -144,21 +144,24 @@ local function each_deconjugated_term(term, callback)
 end
 
 local function find_clean_term(db, term)
-	if type(term) ~= "string" or term == "" then return nil, nil, 0 end
+	if type(term) ~= "string" or term == "" then return nil, nil, 0, nil end
 	local entry = db[term]
-	if entry then return entry, term, 0 end
+	if entry then return entry, term, 0, "exact" end
 
-	local stripped_entry, stripped, stripped_bytes = each_deconjugated_term(term, function(base, base_stripped_bytes)
+	local stripped_entry, stripped, stripped_bytes, match_kind = each_deconjugated_term(
+		term,
+		function(base, base_stripped_bytes, kind)
 		local entry_for_base = db[base]
 		if entry_for_base then
-			return entry_for_base, base, base_stripped_bytes
+			return entry_for_base, base, base_stripped_bytes, kind
 		end
-	end)
+	end
+	)
 	if stripped_entry then
-		return stripped_entry, stripped, stripped_bytes
+		return stripped_entry, stripped, stripped_bytes, match_kind
 	end
 
-	return nil, nil, 0
+	return nil, nil, 0, nil
 end
 
 local function has_database_match(db, term)
@@ -170,23 +173,30 @@ local function has_database_match(db, term)
 	return entry ~= nil
 end
 
+local function get_surface_match_bytes(surface_text, stripped_bytes, match_kind)
+	if match_kind == "suffix_strip" then
+		return math.max(0, #surface_text - (stripped_bytes or 0))
+	end
+	return #surface_text
+end
+
 local function resolve_term_color(db, hw)
 	if type(hw) == "string" then
 		if hw ~= "" then
-			local entry, matched, stripped = find_clean_term(db, hw)
-			if entry then return word_color(entry), matched, stripped, hw end
+			local entry, matched, stripped, match_kind = find_clean_term(db, hw)
+			if entry then return word_color(entry), matched, stripped, hw, match_kind end
 		end
 	elseif type(hw) == "table" then
 		local term = hw.term or hw.expression
 		local hw_reading = hw.reading or term
 		if type(term) == "string" and term ~= "" then
-			local entry, matched, stripped = find_clean_term(db, term)
-			if entry then return word_color(entry), matched, stripped, hw_reading end
+			local entry, matched, stripped, match_kind = find_clean_term(db, term)
+			if entry then return word_color(entry), matched, stripped, hw_reading, match_kind end
 		end
 
 		for _, v in ipairs(hw) do
-			local color, found_term, stripped, found_reading = resolve_term_color(db, v)
-			if color then return color, found_term, stripped, found_reading end
+			local color, found_term, stripped, found_reading, match_kind = resolve_term_color(db, v)
+			if color then return color, found_term, stripped, found_reading, match_kind end
 		end
 	end
 	return nil
@@ -242,6 +252,20 @@ local function utf8_char_len_at(text, byte_index)
 		return 2
 	end
 	return 1
+end
+
+local function utf8_char_count(text)
+	if type(text) ~= "string" or text == "" then
+		return 0
+	end
+
+	local count = 0
+	local i = 1
+	while i <= #text do
+		i = i + utf8_char_len_at(text, i)
+		count = count + 1
+	end
+	return count
 end
 
 local function matches_base_form(term, target)
@@ -353,11 +377,11 @@ function AnkiDB.get_tokens_colors(tokens)
 					if skip and has_database_match(db, combined) then skip = false end
 
 					if not skip then
-						local entry, matched, stripped = find_clean_term(db, combined)
+						local entry, matched, stripped, match_kind = find_clean_term(db, combined)
 						if entry then
 							local color = word_color(entry)
 							if color then
-								matched_len_bytes = #combined - (stripped or 0)
+								matched_len_bytes = get_surface_match_bytes(combined, stripped, match_kind)
 								matched_color = color
 								matched_term = matched
 								break
@@ -376,12 +400,12 @@ function AnkiDB.get_tokens_colors(tokens)
 				end
 
 				if token.headwords and not text_is_single_kana and not skip_kana then
-					local color, term_matched, stripped_bytes, hw_reading = resolve_term_color(db, token.headwords)
+					local color, term_matched, stripped_bytes, hw_reading, match_kind = resolve_term_color(db, token.headwords)
 					if color then
 						local txt = token.text or ""
 						local tok_reading = (token.reading ~= "" and token.reading) or txt
 						if token_matches_headword(txt, tok_reading, term_matched, hw_reading) then
-							matched_len_bytes = #txt - (stripped_bytes or 0)
+							matched_len_bytes = get_surface_match_bytes(txt, stripped_bytes, match_kind)
 							matched_color = color
 							matched_term = term_matched
 						end
@@ -404,15 +428,16 @@ function AnkiDB.get_tokens_colors(tokens)
 
 				local sub = full_text:sub(b, j - 1)
 				local is_single_kana = #full_text > 3 and is_single_kana_string(sub)
+				local sub_char_count = utf8_char_count(sub)
 
 				local sub_is_kana_only = options.colorizer_ignore_kana_only and not contains_kanji(sub)
-				if not is_single_kana then
-					local entry, matched, stripped_bytes = find_clean_term(db, sub)
+				if not is_single_kana and sub_char_count >= 2 then
+					local entry, matched, stripped_bytes, match_kind = find_clean_term(db, sub)
 					if entry then
 						if not (sub_is_kana_only and not has_database_match(db, sub)) then
 							local color = word_color(entry)
 							if color then
-								best_match_bytes = j - b
+								best_match_bytes = get_surface_match_bytes(sub, stripped_bytes, match_kind)
 								best_color = color
 								best_term = matched
 							end
