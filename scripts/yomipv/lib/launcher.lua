@@ -70,9 +70,11 @@ end
 
 function Launcher.shutdown_lookup_app()
 	msg.info("Sending shutdown signal to lookup app")
-	mp.command_native_async({
+	local ok, result = pcall(mp.command_native, {
 		name = "subprocess",
 		playback_only = false,
+		capture_stdout = true,
+		capture_stderr = true,
 		args = {
 			Platform.get_curl_cmd(),
 			"-s",
@@ -85,6 +87,11 @@ function Launcher.shutdown_lookup_app()
 			"http://127.0.0.1:19634/shutdown",
 		},
 	})
+	if not ok then
+		msg.warn("Lookup app shutdown request failed: " .. tostring(result))
+	elseif result and result.status ~= 0 then
+		msg.warn("Lookup app shutdown request exited with status: " .. tostring(result.status))
+	end
 end
 
 return Launcher
