@@ -39,6 +39,11 @@ local Profiles = require("lib.profiles")
 local yomitan, anki, anilist, builder, formatter, history, handler, register_keybindings
 local is_yomipv_loaded = false
 
+local function sync_lookup_app_focus_state()
+	local is_focused = mp.get_property_bool("focused", true)
+	Curl.post("http://127.0.0.1:19634/app-focus?state=" .. tostring(is_focused), "{}", function() end)
+end
+
 local function load_yomipv()
 	if is_yomipv_loaded then
 		Player.notify("Yomipv is already loaded", "info", 2)
@@ -94,6 +99,9 @@ local function load_yomipv()
 	SubtitleFilter.init(config)
 
 	Launcher.launch_lookup_app(config)
+	sync_lookup_app_focus_state()
+	mp.add_timeout(0.25, sync_lookup_app_focus_state)
+	mp.add_timeout(1.0, sync_lookup_app_focus_state)
 	Updater.check_for_updates(config, yomipv_version, Curl)
 	MouseHandler.init(config, handler, history, Selector)
 
@@ -108,11 +116,7 @@ mp.register_event("file-loaded", function()
 end)
 
 mp.observe_property("focused", "bool", function(_, is_focused)
-	if is_focused then
-		Curl.post("http://127.0.0.1:19634/app-focus?state=true", "{}", function() end)
-	else
-		Curl.post("http://127.0.0.1:19634/app-focus?state=false", "{}", function() end)
-	end
+	Curl.post("http://127.0.0.1:19634/app-focus?state=" .. tostring(is_focused), "{}", function() end)
 end)
 
 mp.add_hook("on_pre_shutdown", 50, function()

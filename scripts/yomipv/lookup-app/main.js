@@ -19,6 +19,23 @@ const appIconPath = path.join(__dirname, 'build', 'lookup-app.png');
 let isContextMenuOpen = false;
 let appIsFocused = true;
 
+function revealLookupWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  pendingHide = false;
+  if (lookupSuspendTimeout) {
+    clearTimeout(lookupSuspendTimeout);
+    lookupSuspendTimeout = null;
+  }
+  if (lookupSuspended) {
+    lookupSuspended = false;
+    mainWindow.webContents.send('window-resume-request');
+  }
+  if (!mainWindow.isVisible()) {
+    console.log('[IPC] window is hidden, showing inactive');
+    mainWindow.showInactive();
+  }
+}
+
 // Verify lookup window inspector or detached tools state
 function isMainDevToolsOpen() {
   const isDevToolsAlive = typeof devToolsWin !== 'undefined' && devToolsWin && !devToolsWin.isDestroyed();
@@ -382,8 +399,8 @@ app.whenReady().then(() => {
               res.end('ok');
               return;
             }
-            pendingHide = false;
             if (mainWindow) {
+              revealLookupWindow();
               mainWindow.webContents.send('lookup-term', data);
             }
           }
@@ -644,11 +661,7 @@ ipcMain.on('show-window', () => {
       console.log('[IPC] show-window ignored: mpv is unfocused');
       return;
     }
-    pendingHide = false;
-    if (!mainWindow.isVisible()) {
-      console.log('[IPC] window is hidden, showing inactive');
-      mainWindow.showInactive();
-    }
+    revealLookupWindow();
   }
 });
 

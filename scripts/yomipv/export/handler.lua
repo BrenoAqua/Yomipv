@@ -975,6 +975,8 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 				customCss = custom_css,
 			}
 			local json_body = require("mp.utils").format_json(data_to_send)
+			local is_focused = mp.get_property_bool("focused", true)
+			Curl.post("http://127.0.0.1:19634/app-focus?state=" .. tostring(is_focused), "{}", function() end)
 			Curl.post("http://127.0.0.1:19634", json_body, function() end)
 		end,
 		on_hide = function()
