@@ -149,10 +149,11 @@ local default_options = {
 	selector_trigger_mouse_idle_time = 5.0, -- Seconds mouse must be idle before movement triggers selector
 
 	-- Colorizer
-	colorizer_enabled = false,
-	selector_colorize_words = false,
-	selector_colorize_underline = false,
-	selector_colorize_opacity = 100,
+	colorizer_enabled = false, -- Replace MPV subtitles with Yomipv-rendered subtitles
+	selector_colorize_words = false, -- Main toggle for word coloring
+	colorizer_ignore_kana_only = false, -- Skip kana-only words with no database match
+	selector_colorize_underline = false, -- Show colors on underlines instead of words
+	selector_colorize_opacity = 100, -- Opacity of colorized underlines from 0 to 100
 
 	-- Lookup
 	pre_tokenize = true, -- Pre-tokenize subtitles as they appear
@@ -213,9 +214,6 @@ local default_options = {
 	key_build_ankidb = "B",
 	key_toggle_picture_animated = "g",
 	key_toggle_picture_timestamp_source = "Ctrl+g",
-
-	-- Misc
-	lookup_app_path = "lookup-app",
 
 	--[[ History settings ]]
 

@@ -8,11 +8,8 @@ local Platform = require("lib.platform")
 
 local Launcher = {}
 
-function Launcher.launch_lookup_app(config)
-	local app_path = config.lookup_app_path
-	if not app_path or app_path == "" then
-		return
-	end
+function Launcher.launch_lookup_app(_config)
+	local app_path = "lookup-app"
 
 	-- Resolve relative paths against the script directory
 	if not app_path:find(":") and not app_path:find("^/") then

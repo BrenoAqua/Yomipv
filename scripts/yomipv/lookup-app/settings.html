@@ -33,8 +33,16 @@
         Audio
       </button>
 
+      <button class="nav-item" data-section="lookup" id="nav-lookup">
+        Lookup
+      </button>
+
       <button class="nav-item" data-section="selector" id="nav-selector">
         Selector
+      </button>
+
+      <button class="nav-item" data-section="colorizer" id="nav-colorizer">
+        Colorizer
       </button>
 
       <button class="nav-item" data-section="history" id="nav-history">
@@ -51,10 +59,6 @@
 
       <button class="nav-item" data-section="updater" id="nav-updater">
         Updater
-      </button>
-
-      <button class="nav-item" data-section="mpv" id="nav-mpv">
-        MPV Settings
       </button>
     </nav>
 
@@ -84,9 +88,19 @@
         <div class="field-group" id="fields-audio"></div>
       </section>
 
+      <section class="settings-section hidden" id="section-lookup">
+        <h2>Lookup</h2>
+        <div class="field-group" id="fields-lookup"></div>
+      </section>
+
       <section class="settings-section hidden" id="section-selector">
         <h2>Selector</h2>
         <div class="field-group" id="fields-selector"></div>
+      </section>
+
+      <section class="settings-section hidden" id="section-colorizer">
+        <h2>Colorizer</h2>
+        <div class="field-group" id="fields-colorizer"></div>
       </section>
 
       <section class="settings-section hidden" id="section-history">
@@ -107,11 +121,6 @@
       <section class="settings-section hidden" id="section-updater">
         <h2>Updater</h2>
         <div class="field-group" id="fields-updater"></div>
-      </section>
-
-      <section class="settings-section hidden" id="section-mpv">
-        <h2>MPV Settings</h2>
-        <div class="field-group" id="fields-mpv"></div>
       </section>
     </main>
   </div>

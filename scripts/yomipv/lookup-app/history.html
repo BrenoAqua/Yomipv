@@ -9,11 +9,22 @@
   <div id="history-container">
     <div id="history-header">
       <span id="header-title">HISTORY</span>
-      <div class="header-buttons">
-        <button id="time-toggle">SUB START</button>
-        <button id="anim-toggle">GIF: OFF</button>
-        <button id="clear-history">CLEAR</button>
-        <button id="open-settings">⚙</button>
+      <div class="header-actions">
+        <div class="header-dropdown">
+          <button id="history-menu-toggle" aria-label="History actions" aria-expanded="false">
+            <span class="menu-dots" aria-hidden="true">
+              <span class="menu-dot"></span>
+              <span class="menu-dot"></span>
+              <span class="menu-dot"></span>
+            </span>
+          </button>
+          <div id="history-menu" class="history-menu" hidden>
+            <button id="time-toggle">SUB START</button>
+            <button id="anim-toggle">GIF: OFF</button>
+            <button id="clear-history">CLEAR</button>
+          </div>
+        </div>
+        <button id="open-settings" aria-label="Open settings">&#9881;</button>
       </div>
     </div>
     <div id="history-scroll-clip">

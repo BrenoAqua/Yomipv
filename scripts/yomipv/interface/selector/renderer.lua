@@ -10,6 +10,10 @@ local measure_overlay = mp.create_osd_overlay("ass-events")
 measure_overlay.compute_bounds = true
 measure_overlay.hidden = true
 
+local _measure_cache = {}
+local _measure_cache_keys = {}
+local _MEASURE_CACHE_MAX = 500
+
 function Renderer.measure_width(text, size, font, bold)
 	if not text or text == "" then
 		return 0
@@ -18,6 +22,12 @@ function Renderer.measure_width(text, size, font, bold)
 	if not ow or ow <= 0 then
 		ow, oh = 1280, 720
 	end
+
+	local cache_key = text .. "\0" .. size .. "\0" .. font .. "\0" .. (bold and "1" or "0") .. "\0" .. ow
+	if _measure_cache[cache_key] then
+		return _measure_cache[cache_key]
+	end
+
 	measure_overlay.res_x = ow
 	measure_overlay.res_y = oh
 
@@ -30,10 +40,22 @@ function Renderer.measure_width(text, size, font, bold)
 	measure_overlay.data = ass_m
 	local res_m = measure_overlay:update()
 
-	if not res or not res_m then
-		return 0
+	local width = 0
+	if res and res_m then
+		width = math.max(0, (res.x1 - res.x0) - (res_m.x1 - res_m.x0))
 	end
-	return math.max(0, (res.x1 - res.x0) - (res_m.x1 - res_m.x0))
+
+	if #_measure_cache_keys >= _MEASURE_CACHE_MAX then
+		_measure_cache[table.remove(_measure_cache_keys, 1)] = nil
+	end
+	table.insert(_measure_cache_keys, cache_key)
+	_measure_cache[cache_key] = width
+	return width
+end
+
+function Renderer.clear_measure_cache()
+	_measure_cache = {}
+	_measure_cache_keys = {}
 end
 
 function Renderer.render(selector)
@@ -110,12 +132,14 @@ function Renderer.render(selector)
 			if segment_text ~= "" then
 				local tw = Renderer.measure_width(segment_text, font_size, font_name, sub_bold)
 
-							if current_line.width > 0 and current_line.width + tw > max_width then
+				if current_line.width > 0 and current_line.width + tw > max_width then
 					current_line = { tokens = {}, width = 0 }
 					table.insert(lines, current_line)
 				end
 
-				table.insert(current_line.tokens, { index = i, visual_text = segment_text, width = tw })
+				table.insert(current_line.tokens, {
+					index = i, visual_text = segment_text, width = tw, start_byte_in_token = search_pos,
+				})
 				current_line.width = current_line.width + tw
 			end
 
@@ -225,29 +249,62 @@ function Renderer.render(selector)
 			end
 
 			if not added_underline and selector.style.colorize_underline and wc then
-				local color = type(wc) == "table" and wc.color or wc
-				local term = type(wc) == "table" and wc.term or nil
-				local underline_x = current_x
-				local underline_w = t_seg.width
+				if type(wc) == "table" and wc[1] and wc[1].start_byte then
+					for _, seg in ipairs(wc) do
+						local seg_start_token = seg.start_byte
+						local seg_end_token = seg.end_byte
 
-				if term and t_seg.visual_text and t_seg.visual_text ~= term then
-					local text_len = #t_seg.visual_text
-					local term_len = #term
-					if text_len > term_len and t_seg.visual_text:sub(text_len - term_len + 1) == term then
-						local prefix = t_seg.visual_text:sub(1, text_len - term_len)
-						local prefix_w = Renderer.measure_width(prefix, font_size, font_name, sub_bold)
-						underline_x = current_x + prefix_w
-						underline_w = t_seg.width - prefix_w
+						local t_seg_start = t_seg.start_byte_in_token
+						local t_seg_end = t_seg.start_byte_in_token + #t_seg.visual_text - 1
+
+						if seg_start_token <= t_seg_end and seg_end_token >= t_seg_start then
+							local overlap_start = math.max(seg_start_token, t_seg_start)
+							local overlap_end = math.min(seg_end_token, t_seg_end)
+
+							local rel_start = overlap_start - t_seg_start + 1
+							local rel_end = overlap_end - t_seg_start + 1
+
+							local prefix = t_seg.visual_text:sub(1, rel_start - 1)
+							local match_text = t_seg.visual_text:sub(rel_start, rel_end)
+
+							local prefix_w = Renderer.measure_width(prefix, font_size, font_name, sub_bold)
+							local match_w = Renderer.measure_width(match_text, font_size, font_name, sub_bold)
+
+							table.insert(underlines, {
+								x = current_x + prefix_w,
+								y = y_line + u_offset,
+								w = match_w,
+								color = seg.color,
+								is_colorizer = true,
+							})
+						end
 					end
-				end
+				else
+					local color = type(wc) == "table" and wc.color or wc
+					local term = type(wc) == "table" and wc.term or nil
+					local underline_x = current_x
+					local underline_w = t_seg.width
 
-				table.insert(underlines, {
-					x = underline_x,
-					y = y_line + u_offset,
-					w = underline_w,
-					color = color,
-					is_colorizer = true,
-				})
+					if term and t_seg.visual_text and t_seg.visual_text ~= term then
+						local start_pos, end_pos = t_seg.visual_text:find(term, 1, true)
+						if start_pos then
+							local prefix = t_seg.visual_text:sub(1, start_pos - 1)
+							local match_text = t_seg.visual_text:sub(start_pos, end_pos)
+							local prefix_w = Renderer.measure_width(prefix, font_size, font_name, sub_bold)
+							local match_w = Renderer.measure_width(match_text, font_size, font_name, sub_bold)
+							underline_x = current_x + prefix_w
+							underline_w = match_w
+						end
+					end
+
+					table.insert(underlines, {
+						x = underline_x,
+						y = y_line + u_offset,
+						w = underline_w,
+						color = color,
+						is_colorizer = true,
+					})
+				end
 			end
 
 			-- Handle text rendering
@@ -300,8 +357,54 @@ function Renderer.render(selector)
 				end
 			else
 				if wc and not selector.style.colorize_underline then
-					local color = type(wc) == "table" and wc.color or wc
-					osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", color, t_seg.visual_text, main_color))
+					if type(wc) == "table" and wc[1] and wc[1].start_byte then
+						local last_end = 1
+						for _, seg in ipairs(wc) do
+							local seg_start_token = seg.start_byte
+							local seg_end_token = seg.end_byte
+
+							local t_seg_start = t_seg.start_byte_in_token
+							local t_seg_end = t_seg.start_byte_in_token + #t_seg.visual_text - 1
+
+							if seg_start_token <= t_seg_end and seg_end_token >= t_seg_start then
+								local overlap_start = math.max(seg_start_token, t_seg_start)
+								local overlap_end = math.min(seg_end_token, t_seg_end)
+
+								local rel_start = overlap_start - t_seg_start + 1
+								local rel_end = overlap_end - t_seg_start + 1
+
+								if rel_start > last_end then
+									osd:append(t_seg.visual_text:sub(last_end, rel_start - 1))
+								end
+
+								local match_text = t_seg.visual_text:sub(rel_start, rel_end)
+								osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", seg.color, match_text, main_color))
+
+								last_end = rel_end + 1
+							end
+						end
+						if last_end <= #t_seg.visual_text then
+							osd:append(t_seg.visual_text:sub(last_end))
+						end
+					else
+						local color = type(wc) == "table" and wc.color or wc
+						local term = type(wc) == "table" and wc.term or nil
+						if term and t_seg.visual_text and t_seg.visual_text ~= term then
+							local start_pos, end_pos = t_seg.visual_text:find(term, 1, true)
+							if start_pos then
+								local prefix = t_seg.visual_text:sub(1, start_pos - 1)
+								local match_text = t_seg.visual_text:sub(start_pos, end_pos)
+								local suffix = t_seg.visual_text:sub(end_pos + 1)
+								if prefix ~= "" then osd:append(prefix) end
+								osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", color, match_text, main_color))
+								if suffix ~= "" then osd:append(suffix) end
+							else
+								osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", color, t_seg.visual_text, main_color))
+							end
+						else
+							osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", color, t_seg.visual_text, main_color))
+						end
+					end
 				else
 					osd:append(t_seg.visual_text)
 				end
@@ -322,7 +425,27 @@ function Renderer.render(selector)
 		end
 	end
 
+	-- Merge adjacent colorizer underlines sharing the same Y and color into one rect
+	local merged = {}
 	for _, u in ipairs(underlines) do
+		if u.is_colorizer then
+			local found = false
+			for _, m in ipairs(merged) do
+				if m.is_colorizer and m.color == u.color and m.y == u.y and math.abs((m.x + m.w) - u.x) <= 1 then
+					m.w = m.w + u.w
+					found = true
+					break
+				end
+			end
+			if not found then
+				table.insert(merged, { x = u.x, y = u.y, w = u.w, color = u.color, is_colorizer = true })
+			end
+		else
+			table.insert(merged, u)
+		end
+	end
+
+	for _, u in ipairs(merged) do
 		osd:new_event()
 		osd:reset()
 		osd:pos(0, 0)

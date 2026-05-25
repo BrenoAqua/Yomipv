@@ -35,29 +35,38 @@ function Observer.init(handler, yomitan, config)
 end
 
 -- Shared handler for subtitle changes
-function Observer.handle_subtitle_change(name, value)
+function Observer.handle_subtitle_change(name, value, is_proactive)
 	local text = value or ""
 	local StringOps = require("lib.string_ops")
 	local cleaned = StringOps.clean_subtitle(text, true)
 
-	-- Immediate display update for colorizer mode
-	if Observer.config and Observer.config.colorizer_enabled and Observer.yomitan and name == "sub-text" then
-		if not cleaned or cleaned == "" then
-			if Observer.handler and Observer.handler.clear_passive then
-				Observer.handler:clear_passive()
-			end
-		else
-			Observer.yomitan:tokenize(cleaned, function(tokens)
-				-- Ensure this result still matches what's on screen
-				local current = mp.get_property("sub-text", "")
-				if tokens and current ~= "" and StringOps.clean_subtitle(current, true) == cleaned then
-					if Observer.handler and Observer.handler.on_current_tokens_ready then
-						Observer.handler:on_current_tokens_ready(tokens)
-					end
+	-- Limit colorizer path to primary sub-text or proactive pre-render
+	local is_colorizer_path = (is_proactive or name == "sub-text")
+		and Observer.config and Observer.config.colorizer_enabled and Observer.yomitan
+	if is_colorizer_path then
+		if Observer._last_handled_text ~= cleaned then
+			Observer._last_handled_text = cleaned
+			if not cleaned or cleaned == "" then
+				if Observer.handler and Observer.handler.clear_passive then
+					Observer.handler:clear_passive()
 				end
-			end)
+			else
+				Observer.yomitan:tokenize(cleaned, function(tokens)
+					-- Match tokens against current screen state or expected proactive text
+					local current = mp.get_property("sub-text", "")
+					local current_cleaned = StringOps.clean_subtitle(current, true)
+					if tokens and (current_cleaned == cleaned or Observer._last_handled_text == cleaned) then
+						if Observer.handler and Observer.handler.on_current_tokens_ready then
+							Observer.handler:on_current_tokens_ready(tokens)
+						end
+					end
+				end)
+			end
 		end
 	end
+
+	-- Bypass capture timer for proactive updates
+	if is_proactive then return end
 
 	-- Deferred capture to allow secondary subtitles to sync and avoid rapid changes
 	if Observer.capture_timer then
@@ -104,7 +113,7 @@ function Observer.handle_subtitle_change(name, value)
 		local stable_cleaned = StringOps.clean_subtitle(current_text, true)
 		if stable_cleaned and stable_cleaned ~= "" then
 			Observer.yomitan:tokenize(stable_cleaned, function()
-				-- Already handled by immediate update if colorizer is on
+				-- Skip if handled by proactive observer
 			end)
 		end
 
@@ -122,6 +131,37 @@ function Observer.handle_subtitle_change(name, value)
 	end)
 end
 
+function Observer.handle_time_pos(_, time_pos)
+	if not Observer.config or not Observer.config.colorizer_enabled or not Observer.active then return end
+	if not Prefetcher._ready or not Prefetcher._entries then return end
+	if not time_pos then return end
+
+	local sub_delay = mp.get_property_number("sub-delay", 0)
+	local fps = mp.get_property_number("container-fps", 24)
+	if fps <= 0 then fps = 24 end
+	local frame_duration = 1.0 / fps
+
+	-- Look ahead 1 frame to offset OSD render latency
+	local lookahead_time = time_pos + frame_duration
+
+	local active_text = ""
+	for _, entry in ipairs(Prefetcher._entries) do
+		if lookahead_time >= (entry.start_s + sub_delay) and time_pos <= (entry.end_s + sub_delay) then
+			active_text = entry.text
+			break
+		end
+	end
+
+	local StringOps = require("lib.string_ops")
+	local cleaned = StringOps.clean_subtitle(active_text, true)
+
+	-- Restrict proactive triggers to visible subtitles
+	-- Defer clearing to native sub-text observer to respect mpv sub-fix-timing extensions
+	if cleaned ~= "" and Observer._last_handled_text ~= cleaned then
+		Observer.handle_subtitle_change("proactive", active_text, true)
+	end
+end
+
 -- Start observing subtitle property changes
 function Observer.start()
 	if Observer.active then
@@ -130,8 +170,10 @@ function Observer.start()
 
 	msg.info("Starting subtitle observer")
 
+	Observer._last_handled_text = nil
 	mp.observe_property("sub-text", "string", Observer.handle_subtitle_change)
 	mp.observe_property("secondary-sub-text", "string", Observer.handle_subtitle_change)
+	mp.observe_property("time-pos", "number", Observer.handle_time_pos)
 
 	Observer.active = true
 end
@@ -143,6 +185,7 @@ function Observer.stop()
 	end
 
 	mp.unobserve_property(Observer.handle_subtitle_change)
+	mp.unobserve_property(Observer.handle_time_pos)
 	Observer.active = false
 	msg.info("Stopped subtitle observer")
 end

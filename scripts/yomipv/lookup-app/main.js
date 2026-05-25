@@ -19,6 +19,23 @@ const appIconPath = path.join(__dirname, 'build', 'lookup-app.png');
 let isContextMenuOpen = false;
 let appIsFocused = true;
 
+function revealLookupWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  pendingHide = false;
+  if (lookupSuspendTimeout) {
+    clearTimeout(lookupSuspendTimeout);
+    lookupSuspendTimeout = null;
+  }
+  if (lookupSuspended) {
+    lookupSuspended = false;
+    mainWindow.webContents.send('window-resume-request');
+  }
+  if (!mainWindow.isVisible()) {
+    console.log('[IPC] window is hidden, showing inactive');
+    mainWindow.showInactive();
+  }
+}
+
 // Verify lookup window inspector or detached tools state
 function isMainDevToolsOpen() {
   const isDevToolsAlive = typeof devToolsWin !== 'undefined' && devToolsWin && !devToolsWin.isDestroyed();
@@ -377,8 +394,13 @@ app.whenReady().then(() => {
           const data = JSON.parse(body);
           if (data.term) {
             console.log('[IPC] Lookup for:', data.term);
-            pendingHide = false;
+            if (!appIsFocused && !isMainDevToolsOpen()) {
+              console.log('[IPC] Ignoring lookup while mpv is unfocused');
+              res.end('ok');
+              return;
+            }
             if (mainWindow) {
+              revealLookupWindow();
               mainWindow.webContents.send('lookup-term', data);
             }
           }
@@ -635,11 +657,11 @@ ipcMain.on('active-entry', (event, data) => {
 ipcMain.on('show-window', () => {
   if (mainWindow) {
     console.log('[IPC] show-window signal received');
-    pendingHide = false;
-    if (!mainWindow.isVisible()) {
-      console.log('[IPC] window is hidden, showing inactive');
-      mainWindow.showInactive();
+    if (!appIsFocused && !isMainDevToolsOpen()) {
+      console.log('[IPC] show-window ignored: mpv is unfocused');
+      return;
     }
+    revealLookupWindow();
   }
 });
 
