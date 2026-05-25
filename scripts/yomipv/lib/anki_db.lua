@@ -89,6 +89,14 @@ local function word_color(entry)
 	return nil
 end
 
+local function callback_deconjugated_base(base, stripped_bytes, kind, callback)
+	for _, candidate in ipairs(Conjugations.get_base_candidates(base)) do
+		local r1, r2, r3, r4 = callback(candidate, stripped_bytes, kind)
+		if r1 ~= nil then return r1, r2, r3, r4 end
+	end
+	return nil
+end
+
 local function each_deconjugated_term(term, callback)
 	if type(term) ~= "string" or term == "" then
 		return nil
@@ -98,7 +106,7 @@ local function each_deconjugated_term(term, callback)
 		if #term > #p and term:sub(-#p) == p then
 			local stripped = term:sub(1, -(#p + 1))
 			if #stripped >= 3 then
-				local r1, r2, r3, r4 = callback(stripped, #p, "suffix_strip")
+				local r1, r2, r3, r4 = callback_deconjugated_base(stripped, #p, "suffix_strip", callback)
 				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
@@ -108,12 +116,8 @@ local function each_deconjugated_term(term, callback)
 		local p = adj.ending
 		if #term > #p and term:sub(-#p) == p then
 			local stripped = term:sub(1, -(#p + 1)) .. adj.rep
-			if #stripped >= 3 then
-				-- よい is the literary root of いい; normalize to the common card form.
-				if stripped == "よい" then
-					stripped = "いい"
-				end
-				local r1, r2, r3, r4 = callback(stripped, 0, "inflection")
+			if #stripped >= 3 and not Conjugations.is_invalid_adj_base(term, stripped) then
+				local r1, r2, r3, r4 = callback_deconjugated_base(stripped, 0, "inflection", callback)
 				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
@@ -123,7 +127,7 @@ local function each_deconjugated_term(term, callback)
 		if #term > #p and term:sub(-#p) == p then
 			local stripped = term:sub(1, -(#p + 1))
 			if #stripped >= 3 then
-				local r1, r2, r3, r4 = callback(stripped, 0, "inflection")
+				local r1, r2, r3, r4 = callback_deconjugated_base(stripped, 0, "inflection", callback)
 				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
@@ -131,10 +135,10 @@ local function each_deconjugated_term(term, callback)
 
 	for _, verb in ipairs(Conjugations.verb_endings) do
 		local p = verb.ending
-		if #term > #p and term:sub(-#p) == p then
+		if Conjugations.is_valid_verb_match(term, p, verb.rep) and term:sub(-#p) == p then
 			local stripped = term:sub(1, -(#p + 1)) .. verb.rep
 			if #stripped >= 3 then
-				local r1, r2, r3, r4 = callback(stripped, 0, "inflection")
+				local r1, r2, r3, r4 = callback_deconjugated_base(stripped, 0, "inflection", callback)
 				if r1 ~= nil then return r1, r2, r3, r4 end
 			end
 		end
@@ -147,6 +151,12 @@ local function find_clean_term(db, term)
 	if type(term) ~= "string" or term == "" then return nil, nil, 0, nil end
 	local entry = db[term]
 	if entry then return entry, term, 0, "exact" end
+	for _, candidate in ipairs(Conjugations.get_base_candidates(term)) do
+		if candidate ~= term then
+			entry = db[candidate]
+			if entry then return entry, candidate, 0, "exact" end
+		end
+	end
 
 	local stripped_entry, stripped, stripped_bytes, match_kind = each_deconjugated_term(
 		term,
@@ -180,7 +190,44 @@ local function get_surface_match_bytes(surface_text, stripped_bytes, match_kind)
 	return #surface_text
 end
 
-local function resolve_term_color(db, hw)
+local function get_source_match_bytes(source, surface)
+	if type(source) ~= "table" or type(surface) ~= "string" or surface == "" then
+		return nil
+	end
+
+	local original = source.originalText or source.transformedText
+	if type(original) ~= "string" or original == "" then
+		return nil
+	end
+
+	if original == surface then
+		return #original
+	end
+
+	if original:sub(1, #surface) == surface then
+		return #original
+	end
+
+	return nil
+end
+
+local function get_headword_source_match_bytes(hw, surface)
+	if type(hw) ~= "table" or type(hw.sources) ~= "table" then
+		return nil
+	end
+
+	for _, source in ipairs(hw.sources) do
+		local bytes = get_source_match_bytes(source, surface)
+		if bytes then
+			return bytes
+		end
+	end
+	return nil
+end
+
+local get_reading_spelling_candidates
+
+local function resolve_term_color(db, hw, surface_text)
 	if type(hw) == "string" then
 		if hw ~= "" then
 			local entry, matched, stripped, match_kind = find_clean_term(db, hw)
@@ -191,12 +238,30 @@ local function resolve_term_color(db, hw)
 		local hw_reading = hw.reading or term
 		if type(term) == "string" and term ~= "" then
 			local entry, matched, stripped, match_kind = find_clean_term(db, term)
-			if entry then return word_color(entry), matched, stripped, hw_reading, match_kind end
+			if entry then
+				return word_color(entry), matched, stripped, hw_reading, match_kind,
+					get_headword_source_match_bytes(hw, surface_text)
+			end
+		end
+		for _, candidate in ipairs(get_reading_spelling_candidates(term, hw_reading)) do
+			local entry, matched, stripped, match_kind = find_clean_term(db, candidate)
+			if entry then
+				return word_color(entry), matched, stripped, hw_reading, match_kind,
+					get_headword_source_match_bytes(hw, surface_text)
+			end
+		end
+		if type(hw_reading) == "string" and hw_reading ~= "" and hw_reading ~= term then
+			local entry, matched, stripped, match_kind = find_clean_term(db, hw_reading)
+			if entry then
+				return word_color(entry), matched, stripped, hw_reading, match_kind,
+					get_headword_source_match_bytes(hw, surface_text)
+			end
 		end
 
 		for _, v in ipairs(hw) do
-			local color, found_term, stripped, found_reading, match_kind = resolve_term_color(db, v)
-			if color then return color, found_term, stripped, found_reading, match_kind end
+			local color, found_term, stripped, found_reading, match_kind, source_match_bytes =
+				resolve_term_color(db, v, surface_text)
+			if color then return color, found_term, stripped, found_reading, match_kind, source_match_bytes end
 		end
 	end
 	return nil
@@ -233,6 +298,126 @@ local function contains_kanji(text)
 		end
 	end
 	return false
+end
+
+local function split_utf8_chars(text)
+	local chars = {}
+	local i = 1
+	while i <= #text do
+		local byte = text:byte(i)
+		local len = 1
+		if byte and byte >= 0xC0 then
+			if byte >= 0xF0 then
+				len = 4
+			elseif byte >= 0xE0 then
+				len = 3
+			else
+				len = 2
+			end
+		end
+		table.insert(chars, text:sub(i, i + len - 1))
+		i = i + len
+	end
+	return chars
+end
+
+local function next_literal(chars, start_index)
+	local literal = ""
+	for i = start_index, #chars do
+		if contains_kanji(chars[i]) then
+			break
+		end
+		literal = literal .. chars[i]
+	end
+	return literal
+end
+
+local function build_reading_pieces(term, reading)
+	if type(term) ~= "string" or type(reading) ~= "string"
+		or term == "" or reading == "" or not contains_kanji(term) then
+		return nil
+	end
+
+	local chars = split_utf8_chars(term)
+	local pieces = {}
+	local reading_pos = 1
+	local i = 1
+	local has_literal = false
+
+	while i <= #chars do
+		local char = chars[i]
+		if contains_kanji(char) then
+			local original = ""
+			repeat
+				original = original .. chars[i]
+				i = i + 1
+			until i > #chars or not contains_kanji(chars[i])
+
+			local literal = next_literal(chars, i)
+			local end_pos = #reading + 1
+			if literal ~= "" then
+				local found = reading:find(literal, reading_pos, true)
+				if not found then return nil end
+				end_pos = found
+			end
+
+			local replacement = reading:sub(reading_pos, end_pos - 1)
+			if replacement == "" then return nil end
+			table.insert(pieces, { original = original, replacement = replacement, replaceable = true })
+			reading_pos = end_pos
+		else
+			if reading:sub(reading_pos, reading_pos + #char - 1) ~= char then
+				return nil
+			end
+			has_literal = true
+			table.insert(pieces, { original = char, replaceable = false })
+			reading_pos = reading_pos + #char
+			i = i + 1
+		end
+	end
+
+	if reading_pos <= #reading then
+		return nil
+	end
+	if not has_literal then
+		return nil
+	end
+	return pieces
+end
+
+function get_reading_spelling_candidates(term, reading)
+	local pieces = build_reading_pieces(term, reading)
+	if not pieces then return {} end
+
+	local group_count = 0
+	for _, piece in ipairs(pieces) do
+		if piece.replaceable then group_count = group_count + 1 end
+	end
+	if group_count == 0 or group_count > 8 then return {} end
+
+	local candidates = {}
+	local max_mask = (2 ^ group_count) - 1
+	for mask = 1, max_mask do
+		local group_index = 0
+		local candidate = ""
+		for _, piece in ipairs(pieces) do
+			if piece.replaceable then
+				group_index = group_index + 1
+				local bit = 2 ^ (group_index - 1)
+				if math.floor(mask / bit) % 2 == 1 then
+					candidate = candidate .. piece.replacement
+				else
+					candidate = candidate .. piece.original
+				end
+			else
+				candidate = candidate .. piece.original
+			end
+		end
+		if candidate ~= term then
+			table.insert(candidates, candidate)
+		end
+	end
+	return candidates
 end
 
 local function is_single_kana_string(text)
@@ -400,12 +585,13 @@ function AnkiDB.get_tokens_colors(tokens)
 				end
 
 				if token.headwords and not text_is_single_kana and not skip_kana then
-					local color, term_matched, stripped_bytes, hw_reading, match_kind = resolve_term_color(db, token.headwords)
+					local txt = token.text or ""
+					local color, term_matched, stripped_bytes, hw_reading, match_kind, source_match_bytes =
+						resolve_term_color(db, token.headwords, txt)
 					if color then
-						local txt = token.text or ""
 						local tok_reading = (token.reading ~= "" and token.reading) or txt
-						if token_matches_headword(txt, tok_reading, term_matched, hw_reading) then
-							matched_len_bytes = get_surface_match_bytes(txt, stripped_bytes, match_kind)
+						if source_match_bytes or token_matches_headword(txt, tok_reading, term_matched, hw_reading) then
+							matched_len_bytes = source_match_bytes or get_surface_match_bytes(txt, stripped_bytes, match_kind)
 							matched_color = color
 							matched_term = term_matched
 						end
@@ -431,7 +617,7 @@ function AnkiDB.get_tokens_colors(tokens)
 				local sub_char_count = utf8_char_count(sub)
 
 				local sub_is_kana_only = options.colorizer_ignore_kana_only and not contains_kanji(sub)
-				if not is_single_kana and sub_char_count >= 2 then
+				if not is_single_kana and (sub_char_count >= 2 or contains_kanji(sub)) then
 					local entry, matched, stripped_bytes, match_kind = find_clean_term(db, sub)
 					if entry then
 						if not (sub_is_kana_only and not has_database_match(db, sub)) then
