@@ -53,11 +53,19 @@ let mpvIpcQueue = [];
 function sendMpvMessage(message, ...args) {
   if (mpvIpc) {
     const cmd = { command: [message, ...args] };
-    mpvIpc.write(JSON.stringify(cmd) + '\n');
+    const ok = mpvIpc.write(JSON.stringify(cmd) + '\n', (err) => {
+      if (err) console.warn(`[IPC] Failed to send ${message}:`, err.message);
+    });
+    if (!ok) console.warn(`[IPC] Backpressure while sending ${message}`);
   } else {
     console.warn(`[IPC] Queuing ${message}: mpvIpc not connected`);
     mpvIpcQueue.push([message, ...args]);
   }
+}
+
+function requestSettingsRefresh() {
+  sendMpvMessage('script-message', 'yomipv-get-settings');
+  sendMpvMessage('script-message', 'yomipv-list-profiles');
 }
 
 function createWindow() {
@@ -131,6 +139,7 @@ function createSettingsWindow() {
   if (settingsWindow) {
     settingsWindow.show();
     settingsWindow.focus();
+    requestSettingsRefresh();
     return;
   }
 
@@ -150,7 +159,10 @@ function createSettingsWindow() {
   settingsWindow.setAlwaysOnTop(true, 'screen-saver', 1);
   settingsWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   settingsWindow.loadFile('settings.html');
-  settingsWindow.once('ready-to-show', () => settingsWindow.show());
+  settingsWindow.once('ready-to-show', () => {
+    settingsWindow.show();
+    requestSettingsRefresh();
+  });
   settingsWindow.on('closed', () => settingsWindow = null);
 }
 
@@ -725,7 +737,7 @@ ipcMain.on('open-settings', () => {
 });
 
 ipcMain.on('settings-window-ready', (event) => {
-  sendMpvMessage('script-message', 'yomipv-get-settings');
+  requestSettingsRefresh();
 });
 
 ipcMain.on('settings-set', (event, { key, value }) => {
@@ -733,7 +745,7 @@ ipcMain.on('settings-set', (event, { key, value }) => {
 });
 
 ipcMain.on('profile-list-request', () => {
-  sendMpvMessage('script-message', 'yomipv-list-profiles');
+  requestSettingsRefresh();
 });
 
 ipcMain.on('profile-switch', (event, name) => {

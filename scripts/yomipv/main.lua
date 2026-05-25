@@ -10,7 +10,6 @@ local script_dir = mp.get_script_directory()
 package.path = script_dir .. "/?.lua;" .. script_dir .. "/?/init.lua;" .. package.path
 
 local config = require("options")
-local Platform = require("lib.platform")
 local Curl = require("lib.curl")
 local Player = require("lib.player")
 local Yomitan = require("api.yomitan")
@@ -36,7 +35,7 @@ local Updater = require("lib.updater")
 local MouseHandler = require("interface.mouse_handler")
 local Profiles = require("lib.profiles")
 
-local yomitan, anki, anilist, builder, formatter, history, handler, register_keybindings
+local yomitan, anki, anilist, builder, formatter, history, handler, register_keybindings, get_clean_config
 local is_yomipv_loaded = false
 
 local function sync_lookup_app_focus_state()
@@ -126,34 +125,19 @@ end)
 local function send_to_lookup_app(endpoint, data)
 	local utils = require("mp.utils")
 	local json = utils.format_json(data)
-	local curl_cmd = Platform.get_curl_cmd()
-
-	mp.command_native_async({
-		name = "subprocess",
-		playback_only = false,
-		args = {
-			curl_cmd,
-			"-s",
-			"-X",
-			"POST",
-			"-H",
-			"Content-Type: application/json",
-			"-d",
-			json,
-			"--connect-timeout",
-			"1",
-			"--max-time",
-			"3",
-			"http://127.0.0.1:19634/" .. endpoint,
-		},
-	}, function(success, result, err)
-		if not success or (result and result.status ~= 0) then
+	Curl.request("http://127.0.0.1:19634/" .. endpoint, json, function(success, result, err)
+		if not success then
 			msg.warn(string.format("Lookup App IPC failed (%s): %s", endpoint, err or (result and result.status or "unknown")))
 		end
 	end)
 end
 
-local function get_clean_config()
+local function refresh_settings_window()
+	send_to_lookup_app("settings-data", { config = get_clean_config() })
+	send_to_lookup_app("profile-list-data", Profiles.list())
+end
+
+function get_clean_config()
 	local clean = {}
 	for k, v in pairs(config) do
 		if type(v) ~= "function" and k ~= "defaults" then
@@ -165,7 +149,7 @@ end
 
 -- Settings and profiles communication
 mp.register_script_message("yomipv-get-settings", function()
-	send_to_lookup_app("settings-data", { config = get_clean_config() })
+	refresh_settings_window()
 end)
 
 mp.register_script_message("yomipv-set-setting", function(key, val)
@@ -250,7 +234,10 @@ function register_keybindings()
 
 	if is_yomipv_loaded then
 		local active_bindings = {
-			{ config.key_open_settings, "yomipv-open-settings", function() send_to_lookup_app("settings-open", {}) end },
+			{ config.key_open_settings, "yomipv-open-settings", function()
+				send_to_lookup_app("settings-open", {})
+				mp.add_timeout(0.15, refresh_settings_window)
+			end },
 			{ config.key_open_selector, "yomipv-export", function() if handler then handler:start_export(history) end end },
 			{ config.key_toggle_colorizer, "yomipv-toggle-colorizer", function()
 				if handler then handler:toggle_colorizer() end
