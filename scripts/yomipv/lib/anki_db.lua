@@ -161,6 +161,15 @@ local function find_clean_term(db, term)
 	return nil, nil, 0
 end
 
+local function has_database_match(db, term)
+	if type(term) ~= "string" or term == "" then
+		return false
+	end
+
+	local entry = find_clean_term(db, term)
+	return entry ~= nil
+end
+
 local function resolve_term_color(db, hw)
 	if type(hw) == "string" then
 		if hw ~= "" then
@@ -341,7 +350,7 @@ function AnkiDB.get_tokens_colors(tokens)
 
 				if has_selectable and combined ~= "" then
 					local skip = options.colorizer_ignore_kana_only and not contains_kanji(combined)
-					if skip and db[combined] then skip = false end
+					if skip and has_database_match(db, combined) then skip = false end
 
 					if not skip then
 						local entry, matched, stripped = find_clean_term(db, combined)
@@ -362,7 +371,7 @@ function AnkiDB.get_tokens_colors(tokens)
 				local token = tokens[t_idx]
 				local text_is_single_kana = is_single_kana_string(token.text or "")
 				local skip_kana = options.colorizer_ignore_kana_only and not contains_kanji(token.text or "")
-				if skip_kana and token.text and token.text ~= "" and db[token.text] then
+				if skip_kana and has_database_match(db, token.text) then
 					skip_kana = false
 				end
 
@@ -399,8 +408,8 @@ function AnkiDB.get_tokens_colors(tokens)
 				local sub_is_kana_only = options.colorizer_ignore_kana_only and not contains_kanji(sub)
 				if not is_single_kana then
 					local entry, matched, stripped_bytes = find_clean_term(db, sub)
-					if entry and (matched == sub or stripped_bytes == 0) then
-						if not (sub_is_kana_only and matched ~= sub) then
+					if entry then
+						if not (sub_is_kana_only and not has_database_match(db, sub)) then
 							local color = word_color(entry)
 							if color then
 								best_match_bytes = j - b
