@@ -394,7 +394,8 @@ app.whenReady().then(() => {
           const data = JSON.parse(body);
           if (data.term) {
             console.log('[IPC] Lookup for:', data.term);
-            if (!appIsFocused && !isMainDevToolsOpen()) {
+            const isActuallyFocused = data.isFocused !== undefined ? data.isFocused : appIsFocused;
+            if (!isActuallyFocused && !isMainDevToolsOpen()) {
               console.log('[IPC] Ignoring lookup while mpv is unfocused');
               res.end('ok');
               return;

@@ -80,6 +80,8 @@ function Launcher.shutdown_lookup_app()
 			"POST",
 			"--connect-timeout",
 			"1",
+			"--max-time",
+			"1",
 			"http://127.0.0.1:19634/shutdown",
 		},
 	})

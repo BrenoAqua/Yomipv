@@ -142,6 +142,8 @@ local function send_to_lookup_app(endpoint, data)
 			json,
 			"--connect-timeout",
 			"1",
+			"--max-time",
+			"3",
 			"http://127.0.0.1:19634/" .. endpoint,
 		},
 	}, function(success, result, err)

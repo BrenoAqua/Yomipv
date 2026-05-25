@@ -973,6 +973,7 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 				prioritizeHiraganaMatch = self.config.prioritize_hiragana_match,
 				theme = self.config.lookup_theme,
 				customCss = custom_css,
+				isFocused = mp.get_property_bool("focused", true),
 			}
 			local json_body = require("mp.utils").format_json(data_to_send)
 			local is_focused = mp.get_property_bool("focused", true)
