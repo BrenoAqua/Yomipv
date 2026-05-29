@@ -578,7 +578,6 @@ local function build_reading_pieces(term, reading)
 	local pieces = {}
 	local reading_pos = 1
 	local i = 1
-	local has_literal = false
 
 	while i <= #chars do
 		local char = chars[i]
@@ -605,7 +604,6 @@ local function build_reading_pieces(term, reading)
 			if reading:sub(reading_pos, reading_pos + #char - 1) ~= char then
 				return nil
 			end
-			has_literal = true
 			table.insert(pieces, { original = char, replaceable = false })
 			reading_pos = reading_pos + #char
 			i = i + 1
@@ -613,9 +611,6 @@ local function build_reading_pieces(term, reading)
 	end
 
 	if reading_pos <= #reading then
-		return nil
-	end
-	if not has_literal then
 		return nil
 	end
 	return pieces
@@ -654,6 +649,42 @@ function get_reading_spelling_candidates(term, reading)
 		end
 	end
 	return candidates
+end
+
+local function collect_reading_piece_matches(db, hw, surface_text, matches)
+	if type(hw) ~= "table" then
+		return
+	end
+
+	local term = hw.term or hw.expression
+	local reading = hw.reading or term
+	if type(term) == "string" and term ~= ""
+		and type(reading) == "string" and reading ~= "" then
+		local pieces = build_reading_pieces(term, reading)
+		local surface_start = surface_text:find(term, 1, true)
+		if pieces and surface_start then
+			local term_offset = 0
+			for _, piece in ipairs(pieces) do
+				if piece.replaceable then
+					local entry, matched = find_clean_term(db, piece.replacement, { allow_reading_match = false })
+					local color = entry and word_color(entry) or nil
+					if color then
+						table.insert(matches, {
+							start_byte = surface_start + term_offset,
+							end_byte = surface_start + term_offset + #piece.original - 1,
+							color = color,
+							term = matched,
+						})
+					end
+				end
+				term_offset = term_offset + #piece.original
+			end
+		end
+	end
+
+	for _, child in ipairs(hw) do
+		collect_reading_piece_matches(db, child, surface_text, matches)
+	end
 end
 
 local function is_single_kana_string(text)
@@ -1129,6 +1160,18 @@ function AnkiDB.get_tokens_colors(tokens)
 								matched_color = nil
 								matched_term = nil
 							end
+						end
+					end
+					if not matched_len_bytes then
+						local piece_matches = {}
+						collect_reading_piece_matches(db, token.headwords, txt, piece_matches)
+						for _, match in ipairs(piece_matches) do
+							table.insert(intervals, {
+								start_byte = token_starts[t_idx] + match.start_byte - 1,
+								end_byte = token_starts[t_idx] + match.end_byte - 1,
+								color = match.color,
+								term = match.term,
+							})
 						end
 					end
 				end
