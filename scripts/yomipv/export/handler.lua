@@ -196,6 +196,7 @@ function Handler:initialize_export_context(gui)
 	-- Reset per-session state
 	self.active_entry_expression = nil
 	self.active_entry_reading = nil
+	self.active_entry_original_len = nil
 	self.selected_dictionary = nil
 	self.last_selection = nil
 	self.last_selection_hint = nil
@@ -368,6 +369,10 @@ function Handler:handle_selector_result(context, selected_token)
 			self:on_current_tokens_ready(self.current_tokens)
 		end
 		return
+	end
+
+	if selected_token.capture_time_pos then
+		context.sub.picture_timestamp = selected_token.capture_time_pos
 	end
 
 	-- Clear manual timings to prevent stale OSD overlap
@@ -956,8 +961,10 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 			self.selected_dictionary = nil
 			self.active_entry_expression = nil
 			self.active_entry_reading = nil
+			self.active_entry_original_len = nil
 			self.pending_lookup_term = data.term
 			self.pending_lookup_reading = data.reading
+			self.lookup_request_id = (self.lookup_request_id or 0) + 1
 
 			local custom_css = mp.command_native({ "expand-path", "~~/script-opts/yomipv.css" })
 			if require("mp.utils").file_info(custom_css) == nil then
@@ -974,6 +981,7 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 				theme = self.config.lookup_theme,
 				customCss = custom_css,
 				isFocused = mp.get_property_bool("focused", true),
+				lookupRequestId = self.lookup_request_id,
 			}
 			local json_body = require("mp.utils").format_json(data_to_send)
 			local is_focused = mp.get_property_bool("focused", true)
@@ -983,6 +991,7 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		on_hide = function()
 			self.pending_lookup_term = nil
 			self.pending_lookup_reading = nil
+			self.lookup_request_id = (self.lookup_request_id or 0) + 1
 			Curl.post("http://127.0.0.1:19634/hide", "{}", function() end)
 		end,
 		word_colors = word_colors,
@@ -1105,9 +1114,18 @@ function Handler:sync_selection_hint(text)
 	self.last_selection_hint = text ~= "" and text or nil
 end
 
-function Handler:set_active_entry(expression, reading)
+function Handler:set_active_entry(expression, reading, original_len)
 	self.active_entry_expression = expression ~= "" and expression or nil
 	self.active_entry_reading = reading ~= "" and reading or nil
+	self.active_entry_original_len = tonumber(original_len) or 0
+end
+
+function Handler:is_current_lookup_request(request_id)
+	local numeric_id = tonumber(request_id)
+	if not numeric_id or numeric_id <= 0 then
+		return true
+	end
+	return numeric_id == self.lookup_request_id
 end
 
 function Handler:new()
@@ -1119,8 +1137,10 @@ function Handler:new()
 		last_selection_hint = nil,
 		active_entry_expression = nil,
 		active_entry_reading = nil,
+		active_entry_original_len = nil,
 		pending_lookup_term = nil,
 		pending_lookup_reading = nil,
+		lookup_request_id = 0,
 		manual_start = nil,
 		manual_end = nil,
 		timing_overlay = mp.create_osd_overlay("ass-events"),
@@ -1220,7 +1240,8 @@ function Handler:refresh_timing_overlay(start_override, end_override)
 end
 
 function Handler:apply_manual_range(context)
-	local history = self.deps.tracker.get_synchronized_history()
+	local history = self.deps.tracker.get_raw_history and self.deps.tracker.get_raw_history()
+		or self.deps.tracker.get_synchronized_history()
 	if not history or #history == 0 then
 		return
 	end
@@ -1229,9 +1250,14 @@ function Handler:apply_manual_range(context)
 	local effective_end = self.manual_end or context.sub["end"]
 
 	local collected = {}
+	local seen = {}
 	for _, entry in ipairs(history) do
 		if entry["end"] > effective_start and entry.start < effective_end then
-			table.insert(collected, entry)
+			local cleaned = StringOps.clean_subtitle(entry.primary_sid or "", true)
+			if cleaned ~= "" and not seen[cleaned] then
+				seen[cleaned] = true
+				table.insert(collected, entry)
+			end
 		end
 	end
 
@@ -1254,6 +1280,7 @@ function Handler:apply_manual_range(context)
 	context.sub.secondary_sid = combined_secondary
 	context.sub.start = effective_start
 	context.sub["end"] = effective_end
+	context.sub.is_manual_range = true
 	context.current_subtitle_text = combined_primary
 	context.first_subtitle = Collections.duplicate(collected[1])
 	context.last_subtitle = Collections.duplicate(collected[#collected])

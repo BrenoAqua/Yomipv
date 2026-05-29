@@ -159,7 +159,35 @@ function Selector:clear_passive()
 	mp.set_osd_ass(0, 0, "")
 end
 
-function Selector:expand_selection_to_match(expression, reading)
+local function selection_len_from_original_length(selector, base_index, base_mora, original_len)
+	local remaining = tonumber(original_len) or 0
+	if remaining <= 0 then
+		return nil, nil
+	end
+
+	for i = 0, #selector.tokens - base_index do
+		local t = selector.tokens[base_index + i]
+		if t then
+			local tk_text = t.text
+			if i == 0 and base_mora and base_mora > 1 then
+				local byte_pos = StringOps.get_char_byte_pos(tk_text, base_mora)
+				tk_text = tk_text:sub(byte_pos)
+			end
+
+			local char_count = StringOps.get_char_count(tk_text)
+			if remaining < char_count then
+				return i + 1, remaining
+			elseif remaining == char_count then
+				return i + 1, nil
+			end
+			remaining = remaining - char_count
+		end
+	end
+
+	return nil, nil
+end
+
+function Selector:expand_selection_to_match(expression, reading, original_len)
 	if not self.active then
 		return
 	end
@@ -183,7 +211,17 @@ function Selector:expand_selection_to_match(expression, reading)
 	local base_index = (self.lookup_locked and self.locked_index) or self.index
 	local base_mora = (self.lookup_locked and self.locked_mora_index) or self.mora_index
 
+	local original_match_len, original_tail_mora =
+		selection_len_from_original_length(self, base_index, base_mora, original_len)
+	if original_match_len then
+		match_len = original_match_len
+		tail_mora = original_tail_mora
+	end
+
 	for i = 0, #self.tokens - base_index do
+		if match_len > 0 then
+			break
+		end
 		local t = self.tokens[base_index + i]
 		if t then
 			local tk_text = t.text
@@ -278,6 +316,7 @@ function Selector:confirm()
 		headwords = state.headwords,
 		offset = state.offset,
 		is_term = true,
+		capture_time_pos = mp.get_property_number("time-pos", 0),
 	}
 
 	if self.persistent_mode then
