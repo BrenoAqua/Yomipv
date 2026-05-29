@@ -11,6 +11,8 @@ local Observer = {
 	active = false,
 }
 
+local COLORIZER_LOOKAHEAD_FRAMES = 1.07
+
 -- Initialize subtitle observer state
 function Observer.init(handler, yomitan, config)
 	Observer.handler = handler
@@ -153,12 +155,15 @@ function Observer.handle_time_pos(_, time_pos)
 	if fps <= 0 then fps = 24 end
 	local frame_duration = 1.0 / fps
 
-	-- Look ahead 1 frame to offset OSD render latency
-	local lookahead_time = time_pos + frame_duration
+	-- Look ahead far enough for the OSD update to land on the subtitle frame
+	local lookahead_time = time_pos + (frame_duration * COLORIZER_LOOKAHEAD_FRAMES)
+	local timing_epsilon = 0.001
 
 	local active_text = ""
 	for _, entry in ipairs(Prefetcher._entries) do
-		if lookahead_time >= (entry.start_s + sub_delay) and time_pos <= (entry.end_s + sub_delay) then
+		local start_time = entry.start_s + sub_delay
+		local end_time = entry.end_s + sub_delay
+		if (lookahead_time + timing_epsilon) >= start_time and time_pos <= end_time then
 			active_text = entry.text
 			break
 		end
