@@ -10,7 +10,6 @@ local japanese_langs = {
 	jp = true,
 	jpn = true,
 	japanese = true,
-	nihongo = true,
 	["日本語"] = true,
 }
 
