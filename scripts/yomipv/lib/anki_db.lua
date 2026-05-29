@@ -267,7 +267,11 @@ local function find_clean_term(db, term)
 
 	if _reading_index then
 		local reading_entry, reading_term, reading_stripped_bytes, reading_match_kind =
-			Conjugations.each_kana_adj_reading_term(term, { is_kana_only = is_kana_only }, function(base, base_stripped_bytes, kind)
+			Conjugations.each_kana_adj_reading_term(term, { is_kana_only = is_kana_only }, function(
+				base,
+				base_stripped_bytes,
+				kind
+			)
 				local resolved_term = _reading_index[normalize_kana(base)]
 				if resolved_term and resolved_term ~= base then
 				local entry_for_reading = db[resolved_term]

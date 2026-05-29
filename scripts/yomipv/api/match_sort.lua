@@ -1,5 +1,5 @@
 --[[
-  Matched-length sorting helpers for dictionary entry ranking.
+  Matched-length sorting helpers for dictionary entry ranking
   Algorithm must stay in sync with lookup-app/match-sort.js
 ]]
 
@@ -60,8 +60,8 @@ function M.prefix_match_len(a, b)
 	return i
 end
 
---- Compute match score: max prefix match of term against expr and reading (kana-normalized).
---- Compares against both expression (handles kanji lookup) and reading (handles kana lookup).
+--- Compute match score: max prefix match of term against expr and reading (kana-normalized)
+--- Compares against both expression (handles kanji lookup) and reading (handles kana lookup)
 ---@param term_cps integer[] pre-computed normalized codepoints of the lookup term
 ---@param expr string
 ---@param reading string

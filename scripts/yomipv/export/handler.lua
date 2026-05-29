@@ -7,6 +7,7 @@ local StringOps = require("lib.string_ops")
 local Player = require("lib.player")
 local Counter = require("lib.counter")
 local Curl = require("lib.curl")
+local SubtitleLanguage = require("subtitle.language")
 
 local Handler = {}
 
@@ -869,6 +870,16 @@ function Handler:on_current_tokens_ready(tokens)
 		return
 	end
 
+	local subtitle_text = ""
+	for _, token in ipairs(tokens or {}) do
+		subtitle_text = subtitle_text .. (token.text or "")
+	end
+	if not SubtitleLanguage.is_primary_subtitle_japanese(subtitle_text) then
+		self.deps.selector:clear_passive()
+		mp.set_property("sub-visibility", "yes")
+		return
+	end
+
 	if self.deps.selector.active then
 		return
 	end
@@ -1153,23 +1164,29 @@ function Handler:new()
 end
 
 function Handler:init()
-	if self.config.colorizer_enabled then
+	if self.config.colorizer_enabled and SubtitleLanguage.is_primary_subtitle_japanese() then
 		mp.set_property("sub-visibility", "no")
 	end
 end
 
 function Handler:sync_state()
 	if self.config.colorizer_enabled then
-		mp.set_property("sub-visibility", "no")
 		local sub = self.deps.tracker.export_current_session()
 		if sub and sub.primary_sid and sub.primary_sid ~= "" then
 			local cleaned = StringOps.clean_subtitle(sub.primary_sid, true)
+			if not SubtitleLanguage.is_primary_subtitle_japanese(cleaned) then
+				mp.set_property("sub-visibility", "yes")
+				self.deps.selector:clear_passive()
+				return
+			end
+			mp.set_property("sub-visibility", "no")
 			self.deps.yomitan:tokenize(cleaned, function(tokens)
 				if self.config.colorizer_enabled then
 					self:on_current_tokens_ready(tokens)
 				end
 			end)
 		else
+			mp.set_property("sub-visibility", "yes")
 			self.deps.selector:clear_passive()
 		end
 	else

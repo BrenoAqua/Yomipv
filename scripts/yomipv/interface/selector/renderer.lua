@@ -428,7 +428,7 @@ function Renderer.render(selector)
 	end
 
 	-- Merge adjacent pieces of the same colorized term, but keep different
-	-- adjacent words visually separated even when they share the same color.
+	-- adjacent words visually separated even when they share the same color
 	local merged = {}
 	for _, u in ipairs(underlines) do
 		if u.is_colorizer then

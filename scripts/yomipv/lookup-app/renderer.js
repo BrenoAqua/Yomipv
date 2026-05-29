@@ -304,7 +304,7 @@ const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents, looku
   entryNext.style.display = showNav ? 'flex' : 'none';
   entryCounter.style.display = showNav ? '' : 'none';
   
-  // Sync active entry for Anki export matching and selector expansion.
+  // Sync active entry for Anki export matching and selector expansion
   ipcRenderer.send('active-entry', {
     expression: fields.expression,
     reading: fields.reading,

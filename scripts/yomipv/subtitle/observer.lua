@@ -4,6 +4,7 @@
 local mp = require("mp")
 local msg = require("mp.msg")
 local Prefetcher = require("subtitle.prefetcher")
+local SubtitleLanguage = require("subtitle.language")
 
 local Observer = {
 	monitor = nil,
@@ -40,9 +41,20 @@ function Observer.handle_subtitle_change(name, value, is_proactive)
 	local StringOps = require("lib.string_ops")
 	local cleaned = StringOps.clean_subtitle(text, true)
 
-	-- Limit colorizer path to primary sub-text or proactive pre-render
-	local is_colorizer_path = (is_proactive or name == "sub-text")
+	-- Limit colorizer path to Japanese primary subtitles
+	local colorizer_candidate = (is_proactive or name == "sub-text")
 		and Observer.config and Observer.config.colorizer_enabled and Observer.yomitan
+	local is_colorizer_path = colorizer_candidate
+		and SubtitleLanguage.is_primary_subtitle_japanese(cleaned)
+	if colorizer_candidate and not is_colorizer_path then
+		if Observer._last_handled_text and Observer._last_handled_text ~= "" then
+			Observer._last_handled_text = ""
+			if Observer.handler and Observer.handler.clear_passive then
+				Observer.handler:clear_passive()
+			end
+		end
+		mp.set_property("sub-visibility", "yes")
+	end
 	if is_colorizer_path then
 		if Observer._last_handled_text ~= cleaned then
 			Observer._last_handled_text = cleaned
@@ -154,6 +166,15 @@ function Observer.handle_time_pos(_, time_pos)
 
 	local StringOps = require("lib.string_ops")
 	local cleaned = StringOps.clean_subtitle(active_text, true)
+	if cleaned ~= "" and not SubtitleLanguage.is_primary_subtitle_japanese(cleaned) then
+		if Observer._last_handled_text and Observer._last_handled_text ~= "" then
+			Observer._last_handled_text = ""
+			if Observer.handler and Observer.handler.clear_passive then
+				Observer.handler:clear_passive()
+			end
+		end
+		return
+	end
 
 	-- Restrict proactive triggers to visible subtitles
 	if cleaned == "" then
