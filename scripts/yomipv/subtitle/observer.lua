@@ -156,8 +156,16 @@ function Observer.handle_time_pos(_, time_pos)
 	local cleaned = StringOps.clean_subtitle(active_text, true)
 
 	-- Restrict proactive triggers to visible subtitles
-	-- Defer clearing to native sub-text observer to respect mpv sub-fix-timing extensions
-	if cleaned ~= "" and Observer._last_handled_text ~= cleaned then
+	if cleaned == "" then
+		local current = mp.get_property("sub-text", "")
+		local current_cleaned = StringOps.clean_subtitle(current, true)
+		if current_cleaned == "" and Observer._last_handled_text and Observer._last_handled_text ~= "" then
+			Observer._last_handled_text = ""
+			if Observer.handler and Observer.handler.clear_passive then
+				Observer.handler:clear_passive()
+			end
+		end
+	elseif Observer._last_handled_text ~= cleaned then
 		Observer.handle_subtitle_change("proactive", active_text, true)
 	end
 end
