@@ -32,8 +32,8 @@ end
 -- New: Red
 local NEW_COLOR = "2020FF"
 
--- Suspended: Dark Red
-local SUSPENDED_COLOR = "00008B"
+-- Suspended: Gray
+local SUSPENDED_COLOR = "A4A4A4"
 
 -- Learning: Orange (#FF8C00) -> Yellow (#FFE000), keyed by interval days
 local LEARNING_MAX = 21
