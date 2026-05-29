@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 ## Installation
 
 ### Recommended
-1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v1.0.3/win-yomipv-v1.0.3.zip), [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v1.0.3/linux-yomipv-v1.0.3.zip), or [macOS Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v1.0.3/mac-yomipv-v1.0.3.zip)
+1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v1.1.0/win-yomipv-v1.1.0.zip), [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v1.1.0/linux-yomipv-v1.1.0.zip), or [macOS Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v1.1.0/mac-yomipv-v1.1.0.zip)
 2. Extract the contents directly into your MPV directory:
     - Windows: `%APPDATA%/mpv/`
     - Linux/macOS: `~/.config/mpv/`
