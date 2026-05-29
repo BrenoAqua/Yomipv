@@ -30,6 +30,12 @@ selector_colorize_words=yes
 selector_colorize_underline=no
 ```
 
+### Subtitle Language
+
+The colorizer only replaces mpv subtitles when the primary subtitle track is Japanese. It uses the track language tag when available (`ja`, `jp`, `jpn`, `japanese`, or `日本語`). If the track has no language tag, it falls back to detecting Japanese characters in the subtitle text
+
+For non-Japanese primary subtitle tracks, normal mpv subtitles stay visible and the colorizer overlay is not shown
+
 ### Synchronization
 
 The colorizer relies on a local snapshot of your Anki database (`anki_words.json`) for performance. You must manually trigger a rebuild of this database to sync your latest Anki progress
