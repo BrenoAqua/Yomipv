@@ -135,6 +135,49 @@ function Anilist:update_episode(media_id, episode_num, callback)
 	end, { headers = headers })
 end
 
+local function trim(text)
+	if type(text) ~= "string" then return "" end
+	return text:gsub("^[ \t\n\r]+", ""):gsub("[ \t\n\r]+$", "")
+end
+
+local function add_unique(list, seen, value)
+	value = trim(value)
+	if value ~= "" and not seen[value] then
+		table.insert(list, value)
+		seen[value] = true
+	end
+end
+
+local function get_title_variants(title)
+	local variants = {}
+	local seen = {}
+
+	add_unique(variants, seen, title)
+
+	local split_source = tostring(title or "") .. " - "
+	for part in split_source:gmatch("(.-)%s+%-%s+") do
+		add_unique(variants, seen, part)
+	end
+
+	return variants
+end
+
+local function get_search_queries(title, season_n)
+	local queries = {}
+	local seen = {}
+
+	for _, variant in ipairs(get_title_variants(title)) do
+		if season_n and season_n > 1 then
+			add_unique(queries, seen, string.format("%s Season %d", variant, season_n))
+			add_unique(queries, seen, string.format("%s %d", variant, season_n))
+		else
+			add_unique(queries, seen, variant)
+		end
+	end
+
+	return queries
+end
+
 function Anilist:check_and_update(title, season_num, episode_num, callback)
 	local season_n = tonumber(season_num)
 
@@ -144,15 +187,7 @@ function Anilist:check_and_update(title, season_num, episode_num, callback)
 		return
 	end
 
-	local primary_query = title
-	local fallback_query = nil
-	if season_n and season_n > 1 then
-		-- Try "Season N" first; bare number suffix is the fallback
-		primary_query = string.format("%s Season %d", title, season_n)
-		fallback_query = string.format("%s %d", title, season_n)
-	end
-
-	msg.info(string.format("Looking up AniList for '%s' to update Episode %s", primary_query, tostring(episode_num)))
+	local search_queries = get_search_queries(title, season_n)
 
 	local function process_media(media, target_ep)
 		if not media.episodes or target_ep <= media.episodes then
@@ -200,25 +235,24 @@ function Anilist:check_and_update(title, season_num, episode_num, callback)
 		end
 	end
 
-	self:search_anime_by_title(primary_query, function(search_success, media_or_err)
-		if search_success then
-			process_media(media_or_err, episode_num)
+	local function try_search(index, last_err)
+		local query = search_queries[index]
+		if not query then
+			if callback then callback(false, last_err or "No anime found") end
 			return
 		end
-		-- Primary query failed; retry with bare number suffix if available
-		if fallback_query then
-			msg.info(string.format("Retrying with fallback query '%s'", fallback_query))
-			self:search_anime_by_title(fallback_query, function(fb_success, fb_media_or_err)
-				if fb_success then
-					process_media(fb_media_or_err, episode_num)
-				else
-					if callback then callback(false, fb_media_or_err) end
-				end
-			end)
-		else
-			if callback then callback(false, media_or_err) end
-		end
-	end)
+
+		msg.info(string.format("Looking up AniList for '%s' to update Episode %s", query, tostring(episode_num)))
+		self:search_anime_by_title(query, function(search_success, media_or_err)
+			if search_success then
+				process_media(media_or_err, episode_num)
+			else
+				try_search(index + 1, media_or_err)
+			end
+		end)
+	end
+
+	try_search(1)
 end
 
 return Anilist

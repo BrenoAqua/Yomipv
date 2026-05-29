@@ -66,8 +66,8 @@ function PrimarySid.auto_load_external_subtitles()
 	end
 
 	if #found_matches > 0 then
-		-- We use cached to avoid immediate overriding if multiple are appended
-		-- Then we check track-list to select the best one.
+		-- Cache entries first to prevent immediate overrides when multiple entries are appended
+		-- Then check the track list and select the best match
 		for _, sub_path in ipairs(found_matches) do
 			msg.info("Auto-loading external subtitle: " .. sub_path)
 			mp.commandv("sub-add", sub_path, "cached")

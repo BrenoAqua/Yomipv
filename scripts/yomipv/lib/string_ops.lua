@@ -195,6 +195,8 @@ function StringOps.clean_title(title, path)
 
 	-- Strip season, episode, and version tags
 	local cleaner_patterns = {
+		"[%s%.%-%_]+[Ee][Pp][Ii][Ss][Oo][Dd][Ee]%s*%d+.*$",
+		"[%s%.%-%_]+[Ee][Pp]?%s*%d+.*$",
 		"[%.%s_]+[Ss]%d+[Ee]%d+",
 		"[%.%s_]+[Ee]%d+",
 		"[%.%s_]+[Ss]eason%s*%d+",
@@ -232,7 +234,8 @@ function StringOps.parse_season_episode(title, path)
 
 	-- Fallback for compact 4-digit blocks
 	if not season then
-		local block = source:match("[Ss](%d%d%d%d)")
+		local block = source:match("^[Ss](%d%d%d%d)")
+			or source:match("[ _%.%-%[%(%{][Ss](%d%d%d%d)")
 		if block then
 			season = block:sub(1, 2)
 			episode = block:sub(3, 4)
@@ -277,7 +280,9 @@ function StringOps.parse_season_episode(title, path)
 
 	-- Independent episode detection
 	if not episode then
-		episode = source:match("[ _%.%-][Ee][Pp]?%s*(%d+)")
+		episode = source:match("[ _%.%-][Ee][Pp][Ii][Ss][Oo][Dd][Ee]%s*(%d+)")
+			or source:match("^[Ee][Pp][Ii][Ss][Oo][Dd][Ee]%s*(%d+)")
+			or source:match("[ _%.%-][Ee][Pp]?%s*(%d+)")
 			or source:match("^[Ee][Pp]?%s*(%d+)")
 			-- Trailing number that isn't part of a season tag
 			or source:match("[ _%.%-](%d+)[^0-9]*$")
