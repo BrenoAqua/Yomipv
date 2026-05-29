@@ -3,8 +3,6 @@ const { ipcRenderer } = require('electron');
 const listContainer = document.getElementById('history-list');
 const scrollClip = document.getElementById('history-scroll-clip');
 const headerTitle = document.getElementById('header-title');
-const menuToggle = document.getElementById('history-menu-toggle');
-const menu = document.getElementById('history-menu');
 const animToggle = document.getElementById('anim-toggle');
 const timeToggle = document.getElementById('time-toggle');
 const settingsBtn = document.getElementById('open-settings');
@@ -14,7 +12,6 @@ let isAppending = false;
 let canExpand = false;
 let autoScroll = true;
 let prevIsAppending = false;
-let isMenuOpen = false;
 
 const container = document.getElementById('history-container');
 
@@ -36,34 +33,12 @@ document.addEventListener('selectionchange', () => {
   }
 });
 
-document.addEventListener('click', (e) => {
-  if (!isMenuOpen) {
-    return;
-  }
-  if (!menu.contains(e.target) && e.target !== menuToggle) {
-    setMenuOpen(false);
-  }
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && isMenuOpen) {
-    setMenuOpen(false);
-  }
-});
-
 const handleCopy = () => {
   const selection = window.getSelection().toString();
   if (selection) {
     require('electron').clipboard.writeText(selection);
     window.getSelection().removeAllRanges();
   }
-};
-
-const setMenuOpen = (open) => {
-  isMenuOpen = open;
-  menu.hidden = !open;
-  menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  menuToggle.classList.toggle('active', open);
 };
 
 document.addEventListener('copy', (e) => {
@@ -132,10 +107,16 @@ ipcRenderer.on('update-history', (event, payload) => {
   headerTitle.textContent = isAppending ? 'SELECTED' : 'HISTORY';
 
   if (config) {
-    animToggle.textContent = config.picture_animated ? 'GIF: ON' : 'GIF: OFF';
+    const gifOn = !!config.picture_animated;
+    animToggle.classList.toggle('active', gifOn);
+    animToggle.setAttribute('aria-label', gifOn ? 'GIF on' : 'GIF off');
+    animToggle.title = gifOn ? 'GIF on' : 'GIF off';
+
     if (config.picture_timestamp_source) {
       const isSub = config.picture_timestamp_source === 'subtitle_start';
-      timeToggle.textContent = isSub ? 'SUB START' : 'CUR POS';
+      timeToggle.classList.toggle('time-current', !isSub);
+      timeToggle.setAttribute('aria-label', isSub ? 'Subtitle start' : 'Current position');
+      timeToggle.title = isSub ? 'Subtitle start' : 'Current position';
     }
     if (config.history_accent_color) {
       const color = config.history_accent_color.trim();
@@ -259,30 +240,20 @@ ipcRenderer.on('show-history', () => {
 
 ipcRenderer.on('hide-history', () => {
   document.body.classList.remove('visible');
-  setMenuOpen(false);
 });
 
 animToggle.addEventListener('click', () => {
-  setMenuOpen(false);
   ipcRenderer.send('history-toggle-anim');
 });
 
 timeToggle.addEventListener('click', () => {
-  setMenuOpen(false);
   ipcRenderer.send('history-toggle-time-source');
 });
 
 settingsBtn.addEventListener('click', () => {
-  setMenuOpen(false);
   ipcRenderer.send('open-settings');
 });
 
-menuToggle.addEventListener('click', (e) => {
-  e.stopPropagation();
-  setMenuOpen(!isMenuOpen);
-});
-
 clearBtn.addEventListener('click', () => {
-  setMenuOpen(false);
   ipcRenderer.send('history-clear');
 });

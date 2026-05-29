@@ -10,20 +10,43 @@
     <div id="history-header">
       <span id="header-title">HISTORY</span>
       <div class="header-actions">
-        <div class="header-dropdown">
-          <button id="history-menu-toggle" aria-label="History actions" aria-expanded="false">
-            <span class="menu-dots" aria-hidden="true">
-              <span class="menu-dot"></span>
-              <span class="menu-dot"></span>
-              <span class="menu-dot"></span>
-            </span>
-          </button>
-          <div id="history-menu" class="history-menu" hidden>
-            <button id="time-toggle">SUB START</button>
-            <button id="anim-toggle">GIF: OFF</button>
-            <button id="clear-history">CLEAR</button>
-          </div>
-        </div>
+        <button id="time-toggle" class="header-icon-button" aria-label="Subtitle start" title="Subtitle start">
+          <svg class="icon-sub-start" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="14" rx="2"></rect>
+            <path d="M8 15h5"></path>
+            <path d="M8 11h8"></path>
+            <path d="M6 3v18"></path>
+          </svg>
+          <svg class="icon-current-pos" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="6"></circle>
+            <path d="M12 3v3"></path>
+            <path d="M12 18v3"></path>
+            <path d="M3 12h3"></path>
+            <path d="M18 12h3"></path>
+            <circle cx="12" cy="12" r="1.5"></circle>
+          </svg>
+        </button>
+        <button id="anim-toggle" class="header-icon-button" aria-label="GIF off" title="GIF off">
+          <svg class="icon-film" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="14" rx="2"></rect>
+            <path d="M8 5v14"></path>
+            <path d="M16 5v14"></path>
+            <path d="M4 9h4"></path>
+            <path d="M16 9h4"></path>
+            <path d="M4 15h4"></path>
+            <path d="M16 15h4"></path>
+          </svg>
+          <span class="state-slash" aria-hidden="true"></span>
+        </button>
+        <button id="clear-history" aria-label="Clear history" title="Clear history">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4h8v2"></path>
+            <path d="M6 6l1 15h10l1-15"></path>
+            <path d="M10 10v7"></path>
+            <path d="M14 10v7"></path>
+          </svg>
+        </button>
         <button id="open-settings" aria-label="Open settings">&#9881;</button>
       </div>
     </div>
