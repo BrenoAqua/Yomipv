@@ -30,10 +30,12 @@ function Picture.create_job(subtitle)
 	if Picture.config.picture_animated then
 		local offset = (not subtitle.is_manual_range) and (Picture.config.animation_offset or 0) or 0
 		local end_offset = (not subtitle.is_manual_range) and (Picture.config.animation_end_offset or 0) or 0
-		timestamp = (subtitle.start or 0) + offset + 0.1
+		local subtitle_start = subtitle.start or 0
+		local subtitle_end = subtitle["end"] or subtitle_start
+		timestamp = subtitle_start + offset + 0.1
 
 		if Picture.config.animation_duration == "auto" and subtitle.start and subtitle["end"] then
-			duration = math.max(0.1, subtitle["end"] - subtitle.start + end_offset - offset)
+			duration = math.max(0.1, (subtitle_end + end_offset) - timestamp)
 		else
 			duration = tonumber(Picture.config.animation_duration) or 2.0
 		end
