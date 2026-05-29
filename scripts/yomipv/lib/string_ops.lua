@@ -7,6 +7,7 @@ local StringOps = {}
 local CONTROL_CHARS_PATTERN = "[\1-\31\127]"
 local WHITESPACE_PATTERN = "[ \t\n\r]+"
 local SUBTITLE_TAGS_PATTERN = "{[^}]-}"
+local HTML_TAGS_PATTERN = "<[^>]->"
 local SUBTITLE_SYMBOLS = { "🔊", "➨", "➡", "➔", "➜", "➝", "➞" }
 local BRACKET_PATTERNS = {
 	"（.-）", -- Full-width
@@ -38,13 +39,13 @@ function StringOps.clean_text(text, preserve_newlines)
 	return cleaned
 end
 
--- Strips ASS tags and symbols from subtitle text
+-- Strips ASS/HTML subtitle styling tags and symbols from subtitle text
 function StringOps.clean_subtitle(text, preserve_newlines)
 	if not text or text == "" then
 		return ""
 	end
 
-	local cleaned = text:gsub(SUBTITLE_TAGS_PATTERN, "")
+	local cleaned = text:gsub(SUBTITLE_TAGS_PATTERN, ""):gsub(HTML_TAGS_PATTERN, "")
 
 	-- Strip symbols individually to avoid UTF-8 bracketed set issues
 	for _, symbol in ipairs(SUBTITLE_SYMBOLS) do
@@ -427,11 +428,18 @@ end
 
 function StringOps.count_shared_prefix(a, b)
 	if not a or not b then return 0 end
+	local function normalize_kana(code)
+		if code >= 0x30A1 and code <= 0x30FA then
+			return code - 0x60
+		end
+		return code
+	end
+
 	local shared = 0
 	local iter_b, state_b, cur_b = StringOps.utf8_codes(b)
 	for _, code_a in StringOps.utf8_codes(a) do
 		local n_b, code_b = iter_b(state_b, cur_b)
-		if not n_b or code_a ~= code_b then
+		if not n_b or normalize_kana(code_a) ~= normalize_kana(code_b) then
 			break
 		end
 		shared = shared + 1

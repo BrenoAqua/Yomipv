@@ -11,7 +11,8 @@ local default_options = {
 	ankiconnect_api_key = "",
 
 	-- Anki DB build settings
-	ankidb_fields = "word Word expression Expression",
+	ankidb_word_fields = "word Word expression Expression",
+	ankidb_reading_fields = "",
 
 	-- Deck and Note type
 	deck = "Senren",
