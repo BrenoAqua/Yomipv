@@ -42,9 +42,10 @@ Pressing this key will fetch your current card intervals and statuses from Anki 
 
 1. **AnkiConnect**: Ensure Anki is open with the AnkiConnect add-on installed and configured
 2. **Database Build**: You must press the `B` key at least once to generate the initial database
-3. **Fields**: Ensure `ankidb_fields` in your configuration correctly maps to the fields in your Anki note types that contain the Japanese expression
+3. **Fields**: Ensure `ankidb_word_fields` maps to the fields in your Anki note types that contain the Japanese expression. Optionally set `ankidb_reading_fields` to fields that contain readings, which makes kana matching more accurate
 
 ```ini
 # Example field mapping for database building
-ankidb_fields=word Word expression Expression
+ankidb_word_fields=word Word expression Expression
+ankidb_reading_fields=reading Reading "Word Reading"
 ```
