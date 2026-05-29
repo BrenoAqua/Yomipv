@@ -118,7 +118,7 @@ mp.observe_property("focused", "bool", function(_, is_focused)
 	Curl.post("http://127.0.0.1:19634/app-focus?state=" .. tostring(is_focused), "{}", function() end)
 end)
 
-mp.add_hook("on_pre_shutdown", 50, function()
+mp.register_event("shutdown", function()
 	Launcher.shutdown_lookup_app()
 end)
 
@@ -173,11 +173,13 @@ mp.register_script_message("yomipv-list-profiles", function()
 end)
 
 -- Process selection events and coordinate dictionary expansion
-mp.register_script_message("yomipv-active-entry", function(exp, red)
+mp.register_script_message("yomipv-active-entry", function(exp, red, original_len, lookup_request_id)
 	if not handler then return end
-	handler:set_active_entry(exp, red)
+	if not handler:is_current_lookup_request(lookup_request_id) then return end
+	local matched_len = tonumber(original_len) or 0
+	handler:set_active_entry(exp, red, matched_len)
 	if handler.deps.selector and handler.deps.selector.active then
-		handler.deps.selector:expand_selection_to_match(exp, red)
+		handler.deps.selector:expand_selection_to_match(exp, red, matched_len)
 	end
 end)
 

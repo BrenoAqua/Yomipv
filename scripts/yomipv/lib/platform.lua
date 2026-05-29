@@ -77,9 +77,6 @@ end
 -- Launcher implementation for Electron frontend
 function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
 	local binary_name = "YomipvLookup" .. Platform.get_binary_extension()
-	if Platform.IS_LINUX then
-		binary_name = "YomipvLookup.AppImage"
-	end
 
 	local root_dir = mp.get_script_directory() .. "/"
 	local binary_path
@@ -88,6 +85,10 @@ function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
 		-- Resolve executable paths within .app bundles
 		local app_bundle = Platform.normalize_path(utils.join_path(root_dir, "YomipvLookup.app"))
 		binary_path = app_bundle .. "/Contents/MacOS/YomipvLookup"
+	elseif Platform.IS_WINDOWS then
+		binary_path = Platform.normalize_path(utils.join_path(root_dir, "YomipvLookup\\" .. binary_name))
+	elseif Platform.IS_LINUX then
+		binary_path = Platform.normalize_path(utils.join_path(root_dir, "YomipvLookup/" .. binary_name))
 	else
 		binary_path = Platform.normalize_path(utils.join_path(root_dir, binary_name))
 	end

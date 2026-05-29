@@ -34,14 +34,13 @@
       }
     ],
     "win": {
-      "target": "portable",
+      "target": "dir",
       "icon": "build/lookup-app.png",
       "artifactName": "${productName}.${ext}"
     },
     "linux": {
-      "target": [
-        "AppImage"
-      ],
+      "target": "dir",
+      "executableName": "YomipvLookup",
       "icon": "build/lookup-app.png",
       "artifactName": "${productName}.${ext}"
     },

@@ -7,6 +7,7 @@ local utils = require("mp.utils")
 local Platform = require("lib.platform")
 
 local Launcher = {}
+local shutdown_sent = false
 
 function Launcher.launch_lookup_app(_config)
 	local app_path = "lookup-app"
@@ -69,6 +70,11 @@ function Launcher.launch_lookup_app(_config)
 end
 
 function Launcher.shutdown_lookup_app()
+	if shutdown_sent then
+		return
+	end
+	shutdown_sent = true
+
 	msg.info("Sending shutdown signal to lookup app")
 	local ok, result = pcall(mp.command_native, {
 		name = "subprocess",

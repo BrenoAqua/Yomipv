@@ -35,15 +35,19 @@ jobs:
         working-directory: scripts/yomipv/lookup-app
         run: npm install
         
-      - name: Build Windows Executable
+      - name: Build Windows Unpacked App
         working-directory: scripts/yomipv/lookup-app
-        run: npx electron-builder --win --x64 --publish never
+        run: npx electron-builder --win dir --x64 --publish never
+
+      - name: Verify Windows Unpacked App
+        shell: bash
+        run: test -f scripts/yomipv/lookup-app/dist/win-unpacked/YomipvLookup.exe
         
       - name: Upload Windows Asset
         uses: actions/upload-artifact@v4
         with:
           name: yomipv-lookup-windows
-          path: scripts/yomipv/lookup-app/dist/*.exe
+          path: scripts/yomipv/lookup-app/dist/win-unpacked
 
   build-linux:
     runs-on: ubuntu-latest
@@ -70,17 +74,20 @@ jobs:
         working-directory: scripts/yomipv/lookup-app
         run: npm install
         
-      - name: Build Linux Binaries
+      - name: Build Linux Unpacked App
         working-directory: scripts/yomipv/lookup-app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --linux --x64 --publish never
+        run: npx electron-builder --linux dir --x64 --publish never
+
+      - name: Verify Linux Unpacked App
+        run: test -x scripts/yomipv/lookup-app/dist/linux-unpacked/YomipvLookup
         
       - name: Upload Linux Asset
         uses: actions/upload-artifact@v4
         with:
           name: yomipv-lookup-linux
-          path: scripts/yomipv/lookup-app/dist/*.AppImage
+          path: scripts/yomipv/lookup-app/dist/linux-unpacked
 
   build-macos:
     runs-on: macos-latest
@@ -165,7 +172,12 @@ jobs:
           
           # Create Windows bundle
           cp -r common-bundle win-bundle
-          cp bin-win/*.exe win-bundle/scripts/yomipv/ || true
+          mkdir -p win-bundle/scripts/yomipv/YomipvLookup
+          if [ -d bin-win/win-unpacked ]; then
+            cp -r bin-win/win-unpacked/. win-bundle/scripts/yomipv/YomipvLookup/
+          else
+            cp -r bin-win/. win-bundle/scripts/yomipv/YomipvLookup/
+          fi
           cp yomipv-updater.ps1 yomipv-updater.bat win-bundle/ 2>/dev/null || true
           cd win-bundle
           zip -r ../win-yomipv-${{ github.ref_name }}.zip ./*
@@ -173,7 +185,13 @@ jobs:
           
           # Create Linux bundle
           cp -r common-bundle linux-bundle
-          cp bin-linux/*.AppImage linux-bundle/scripts/yomipv/ || true
+          mkdir -p linux-bundle/scripts/yomipv/YomipvLookup
+          if [ -d bin-linux/linux-unpacked ]; then
+            cp -r bin-linux/linux-unpacked/. linux-bundle/scripts/yomipv/YomipvLookup/
+          else
+            cp -r bin-linux/. linux-bundle/scripts/yomipv/YomipvLookup/
+          fi
+          chmod +x linux-bundle/scripts/yomipv/YomipvLookup/YomipvLookup
           cp yomipv-updater.sh linux-bundle/ 2>/dev/null || true
           cd linux-bundle
           zip -r ../linux-yomipv-${{ github.ref_name }}.zip ./*
