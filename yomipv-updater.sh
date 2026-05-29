@@ -113,6 +113,34 @@ restore_css() {
     fi
 }
 
+remove_bundled_lookup_app() {
+    local paths=(
+        "$SCRIPT_DIR/scripts/yomipv/YomipvLookup"
+        "$SCRIPT_DIR/scripts/yomipv/YomipvLookup.app"
+        "$SCRIPT_DIR/scripts/yomipv/YomipvLookup.exe"
+    )
+
+    for path in "${paths[@]}"; do
+        if [ -e "$path" ]; then
+            echo -e "${CYAN}Removing stale lookup app bundle: $path${NC}"
+            rm -rf "$path"
+        fi
+    done
+}
+
+update_dependencies() {
+    local app_dir="$SCRIPT_DIR/scripts/yomipv/lookup-app"
+    if [ -f "$app_dir/package.json" ] && [ ! -d "$app_dir/node_modules" ]; then
+        if ! command -v npm &> /dev/null; then
+            echo -e "${YELLOW}Warning: npm is not installed. Run npm install in scripts/yomipv/lookup-app before using source lookup mode.${NC}"
+            return
+        fi
+
+        echo -e "${GREEN}Installing dependencies for lookup-app...${NC}"
+        (cd "$app_dir" && npm install)
+    fi
+}
+
 update_from_source() {
     echo -e "${CYAN}Updating from source (main branch)...${NC}"
     local zip_url="https://github.com/$REPO/archive/refs/heads/main.zip"
@@ -135,8 +163,10 @@ update_from_source() {
         
         # Copy source files excluding git metadata
         cp -r "$source_folder"* "$SCRIPT_DIR/"
+        remove_bundled_lookup_app
         restore_css "$has_css"
         merge_config "$old_conf"
+        update_dependencies
         restart_mpv_instances "$mpv_instances"
     fi
     
@@ -149,8 +179,8 @@ update_from_source() {
 if [ -d "$SCRIPT_DIR/.git" ]; then
     echo -e "${CYAN}Git repository detected. Updating via git...${NC}"
     git fetch origin main
-    local local_hash=$(git rev-parse HEAD)
-    local remote_hash=$(git rev-parse origin/main)
+    local_hash=$(git rev-parse HEAD)
+    remote_hash=$(git rev-parse origin/main)
     
     if [ "$local_hash" == "$remote_hash" ]; then
         echo -e "${GREEN}You are already using the latest version.${NC}"
@@ -158,14 +188,16 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
     fi
     
     echo -e "${GREEN}New updates available. Pulling...${NC}"
-    local old_conf=$(get_config)
-    local has_css=$(backup_css)
-    local mpv_instances=$(get_mpv_instances)
+    old_conf=$(get_config)
+    has_css=$(backup_css)
+    mpv_instances=$(get_mpv_instances)
     stop_yomipv_processes
     
     git pull origin main
+    remove_bundled_lookup_app
     restore_css "$has_css"
     merge_config "$old_conf"
+    update_dependencies
     restart_mpv_instances "$mpv_instances"
     
     echo -e "${CYAN}Update installed!${NC}"
@@ -251,6 +283,7 @@ mpv_instances=$(get_mpv_instances)
 stop_yomipv_processes
 
 echo -e "${GREEN}Extracting update...${NC}"
+remove_bundled_lookup_app
 unzip -o -q "$TEMP_ZIP" -d "$SCRIPT_DIR"
 restore_css "$has_css"
 merge_config "$old_conf"

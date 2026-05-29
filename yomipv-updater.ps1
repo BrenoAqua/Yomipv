@@ -64,6 +64,15 @@ function Get-LocalVersion {
     return "0.0.0"
 }
 
+function Convert-VersionNumber ($version) {
+    if (-not $version) { return 0 }
+    $clean = $version -replace '^v', ''
+    if ($clean -match '^(\d+)\.(\d+)\.(\d+)') {
+        return ([int]$matches[1] * 1000000) + ([int]$matches[2] * 1000) + [int]$matches[3]
+    }
+    return 0
+}
+
 function Get-Config {
     $conf = @{}
     $conf_path = Join-Path $PSScriptRoot "script-opts\yomipv.conf"
@@ -128,6 +137,19 @@ function Restore-Css ($has_css) {
     if ($has_css) {
         $css_path = Join-Path $PSScriptRoot "script-opts\yomipv.css"
         Move-Item -Path "$css_path.tmp_backup" -Destination $css_path -Force
+    }
+}
+
+function Remove-BundledLookupApp {
+    $lookup_dir = Join-Path $PSScriptRoot "scripts\yomipv\YomipvLookup"
+    $lookup_app = Join-Path $PSScriptRoot "scripts\yomipv\YomipvLookup.app"
+    $legacy_exe = Join-Path $PSScriptRoot "scripts\yomipv\YomipvLookup.exe"
+
+    foreach ($path in @($lookup_dir, $lookup_app, $legacy_exe)) {
+        if (Test-Path $path) {
+            Write-Host "Removing stale lookup app bundle: $path" -ForegroundColor Cyan
+            Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -256,6 +278,7 @@ function Update-Yomipv {
         $oldConfig = Get-Config
         $hasCss = Backup-Css
         git pull origin main
+        Remove-BundledLookupApp
         Restore-Css $hasCss
         Merge-Config $oldConfig
         return $true
@@ -293,6 +316,7 @@ function Update-Yomipv {
         if ($source_folder) {
             Write-Host "Applying source changes..." -ForegroundColor Green
             Copy-Item -Path (Join-Path $source_folder.FullName "*") -Destination $PSScriptRoot -Recurse -Force
+            Remove-BundledLookupApp
             Restore-Css $hasCss
             Merge-Config $oldConfig
         }
@@ -319,7 +343,7 @@ function Update-Yomipv {
         Write-Host "Local version: $local_ver"
         Write-Host "Latest version: $latest_ver"
         
-        if ($latest_ver -le $local_ver) {
+        if ((Convert-VersionNumber $latest_ver) -le (Convert-VersionNumber $local_ver)) {
             Write-Host "You are already using the latest version -- v$latest_ver" -ForegroundColor Green
             return $false
         }
@@ -354,6 +378,7 @@ function Update-Yomipv {
         $temp_zip = Join-Path $env:TEMP "yomipv-update.zip"
         Receive-Archive $temp_zip $zip_url
         Install-7z
+        Remove-BundledLookupApp
         Expand-YomipvArchive $temp_zip $PSScriptRoot
         Restore-Css $hasCss
         Merge-Config $oldConfig

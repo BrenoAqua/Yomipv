@@ -20,6 +20,4 @@ if %errorlevel% equ 0 (
     powershell -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%
 )
 
-timeout 5
-pause
 popd
