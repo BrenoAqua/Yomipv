@@ -6,6 +6,7 @@ local msg = require("mp.msg")
 
 local Monitor = {
 	history = {},
+	raw_history = {},
 	recorded = {},
 	appending = false,
 	max_history = 200,
@@ -44,6 +45,18 @@ function Monitor.get_history(count)
 	return Monitor.history
 end
 
+function Monitor.get_raw_history(count)
+	if count and count > 0 then
+		local start_idx = math.max(1, #Monitor.raw_history - count + 1)
+		local result = {}
+		for i = start_idx, #Monitor.raw_history do
+			table.insert(result, Monitor.raw_history[i])
+		end
+		return result
+	end
+	return Monitor.raw_history
+end
+
 -- Normalize text for comparison
 local function normalize(s)
 	if not s or s == "" then
@@ -53,6 +66,83 @@ local function normalize(s)
 	local cleaned = s:gsub("{[^}]-}", ""):gsub("\\N", " "):gsub("\\n", " "):gsub("\\h", " ")
 	cleaned = StringOps.clean_text(cleaned, false)
 	return cleaned:lower():gsub("%s+", " ")
+end
+
+local function append_unique_secondary(entry, secondary)
+	if secondary == "" then
+		return false
+	end
+
+	if (entry.secondary_sid or "") == "" then
+		entry.secondary_sid = secondary
+		return true
+	end
+
+	local existing_lines = {}
+	for line in entry.secondary_sid:gmatch("[^\r\n]+") do
+		local normalized = normalize(line)
+		if normalized ~= "" then
+			existing_lines[normalized] = true
+		end
+	end
+
+	local to_append = {}
+	for line in secondary:gmatch("[^\r\n]+") do
+		local normalized = normalize(line)
+		if normalized ~= "" and not existing_lines[normalized] then
+			table.insert(to_append, line)
+			existing_lines[normalized] = true
+		end
+	end
+
+	if #to_append == 0 then
+		return false
+	end
+
+	entry.secondary_sid = entry.secondary_sid .. "\n" .. table.concat(to_append, "\n")
+	return true
+end
+
+local function make_entry(primary, secondary, subtitle)
+	return {
+		primary_sid = primary,
+		secondary_sid = secondary,
+		start = subtitle.start or 0,
+		["end"] = subtitle["end"] or 0,
+		delay = subtitle.delay or 0,
+		secondary_start = subtitle.secondary_start or 0,
+		secondary_end = subtitle.secondary_end or 0,
+		secondary_delay = subtitle.secondary_delay or 0,
+		timestamp = mp.get_time(),
+	}
+end
+
+local function add_to_raw_history(primary, secondary, subtitle)
+	local last = Monitor.raw_history[#Monitor.raw_history]
+	if last
+		and math.abs((last.start or 0) - (subtitle.start or 0)) < 0.1
+		and normalize(last.primary_sid) == normalize(primary) then
+		if secondary ~= "" then
+			last.secondary_sid = secondary
+			last.secondary_start = subtitle.secondary_start or last.secondary_start
+			last.secondary_end = subtitle.secondary_end or last.secondary_end
+			last.secondary_delay = subtitle.secondary_delay or last.secondary_delay
+		end
+		last["end"] = subtitle["end"] or last["end"]
+		return
+	end
+
+	table.insert(Monitor.raw_history, make_entry(primary, secondary, subtitle))
+	table.sort(Monitor.raw_history, function(a, b)
+		if math.abs(a.start - b.start) < 0.05 then
+			return a.timestamp < b.timestamp
+		end
+		return a.start < b.start
+	end)
+
+	if Monitor.max_history > 0 and #Monitor.raw_history > Monitor.max_history then
+		table.remove(Monitor.raw_history, 1)
+	end
 end
 
 -- Get synchronized history
@@ -146,30 +236,15 @@ function Monitor.add_to_history(subtitle)
 		end
 	end
 
+	add_to_raw_history(primary, secondary, subtitle)
+
 	-- Update existing secondary text
 	if overlap_entry then
 		local norm_overlap = normalize(overlap_entry.primary_sid)
 		local norm_new = normalize(primary)
 		if norm_overlap == norm_new or norm_overlap:find(norm_new, 1, true) then
-			if secondary ~= "" then
-				local norm_existing_sec = normalize(overlap_entry.secondary_sid)
-				local norm_new_sec = normalize(secondary)
-
-				-- Append unique segments
-				if norm_existing_sec == "" then
-					overlap_entry.secondary_sid = secondary
-				elseif not norm_existing_sec:find(norm_new_sec, 1, true) then
-					local to_append = ""
-					for sub_line in secondary:gmatch("[^\r\n]+") do
-						if not norm_existing_sec:find(normalize(sub_line), 1, true) then
-							to_append = to_append .. "\n" .. sub_line
-						end
-					end
-					overlap_entry.secondary_sid = overlap_entry.secondary_sid .. to_append
-					-- Extend duration
-					overlap_entry.secondary_end =
-						math.max(overlap_entry.secondary_end or 0, subtitle.secondary_end or 0)
-				end
+			if append_unique_secondary(overlap_entry, secondary) then
+				overlap_entry.secondary_end = math.max(overlap_entry.secondary_end or 0, subtitle.secondary_end or 0)
 			end
 			return
 		end
@@ -222,15 +297,9 @@ function Monitor.add_to_history(subtitle)
 						previous_entry.primary_sid = previous_entry.primary_sid .. "\n" .. primary
 					end
 
-					local to_append = ""
-					local norm_existing_sec = normalize(previous_entry.secondary_sid)
-					for sub_line in secondary:gmatch("[^\r\n]+") do
-						if not norm_existing_sec:find(normalize(sub_line), 1, true) then
-							to_append = to_append .. "\n" .. sub_line
-						end
+					if append_unique_secondary(previous_entry, secondary) then
+						previous_entry.secondary_end = math.max(previous_entry.secondary_end or 0, subtitle.secondary_end or 0)
 					end
-					previous_entry.secondary_sid = previous_entry.secondary_sid .. to_append
-					previous_entry.secondary_end = math.max(previous_entry.secondary_end or 0, subtitle.secondary_end or 0)
 
 					previous_entry["end"] = subtitle["end"] or previous_entry["end"]
 					return
@@ -252,17 +321,7 @@ function Monitor.add_to_history(subtitle)
 	end
 
 	-- Insert new entry
-	table.insert(Monitor.history, {
-		primary_sid = primary,
-		secondary_sid = secondary,
-		start = subtitle.start or 0,
-		["end"] = subtitle["end"] or 0,
-		delay = subtitle.delay or 0,
-		secondary_start = subtitle.secondary_start or 0,
-		secondary_end = subtitle.secondary_end or 0,
-		secondary_delay = subtitle.secondary_delay or 0,
-		timestamp = mp.get_time(),
-	})
+	table.insert(Monitor.history, make_entry(primary, secondary, subtitle))
 
 	-- Sort chronologically
 	table.sort(Monitor.history, function(a, b)
@@ -310,6 +369,7 @@ end
 -- Clear history entries
 function Monitor.clear_history()
 	Monitor.history = {}
+	Monitor.raw_history = {}
 	msg.info("History cleared")
 end
 

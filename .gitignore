@@ -1,0 +1,6 @@
+tests/
+
+# Lookup app dependencies and build output
+scripts/yomipv/lookup-app/node_modules/
+scripts/yomipv/lookup-app/dist/
+scripts/yomipv/lookup-app/out/

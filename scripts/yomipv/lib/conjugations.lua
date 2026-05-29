@@ -23,6 +23,8 @@ sort_string_rules(noun_suffixes)
 Conjugations.noun_suffixes = noun_suffixes
 
 local adj_endings = {
+	{ ending = "ではなかった", rep = "ではない" },
+	{ ending = "じゃなかった", rep = "じゃない" },
 	{ ending = "よくありませんでした", rep = "いい" },
 	{ ending = "よくなかったです", rep = "いい" },
 	{ ending = "よくありません", rep = "いい" },
@@ -74,6 +76,10 @@ sort_pair_rules(adj_endings)
 Conjugations.adj_endings = adj_endings
 
 local base_candidates = {
+	-- Negative copula/adjective phrase variants
+	["じゃなかった"] = { "じゃない" },
+	["ではなかった"] = { "ではない" },
+
 	-- Common adjective spelling/kanji variants
 	["いい"] = { "良い", "よい", "いい" },
 	["よい"] = { "良い", "よい", "いい" },
@@ -90,6 +96,7 @@ local base_candidates = {
 	["うけ"] = { "受け", "うけ" },
 	["きらい"] = { "嫌い", "きらい" },
 	["くび"] = { "首", "くび" },
+	["くる"] = { "来る", "くる" },
 	["けさ"] = { "今朝", "けさ" },
 	["けいたい"] = { "携帯", "けいたい" },
 	["こと"] = { "事", "こと" },
@@ -127,6 +134,14 @@ function Conjugations.get_base_candidates(base)
 	return base_candidates[base] or { base }
 end
 
+local compound_verb_stems = {
+	{ ending = "い", rep = "う" },
+}
+sort_pair_rules(compound_verb_stems)
+Conjugations.compound_verb_stems = compound_verb_stems
+
+Conjugations.verb_particle_suffixes = { "よ" }
+
 local kana_adj_bases = {
 	["すごい"] = true,
 	["はやい"] = true,
@@ -150,6 +165,10 @@ function Conjugations.is_invalid_adj_base(term, base)
 		return false
 	end
 
+	if base == "じゃない" or base == "ではない" then
+		return false
+	end
+
 	if base == "いい" or base == "よい" then
 		return term:sub(1, #"よ") ~= "よ"
 	end
@@ -167,7 +186,124 @@ function Conjugations.is_valid_verb_match(term, ending, rep)
 		return true
 	end
 
+	if (rep == "くる" or rep == "来る")
+		and #term == #ending
+		and (ending == "きた" or ending == "きて" or ending == "来た" or ending == "来て") then
+		return true
+	end
+
 	return rep == "する" and #term == #ending and #ending >= #"した"
+end
+
+local function callback_deconjugated_base(base, stripped_bytes, kind, callback)
+	for _, candidate in ipairs(Conjugations.get_base_candidates(base)) do
+		local r1, r2, r3, r4 = callback(candidate, stripped_bytes, kind)
+		if r1 ~= nil then return r1, r2, r3, r4 end
+	end
+	return nil
+end
+
+function Conjugations.each_deconjugated_term(term, opts, callback)
+	if type(opts) == "function" and callback == nil then
+		callback = opts
+		opts = {}
+	end
+	opts = opts or {}
+
+	if type(term) ~= "string" or term == "" then
+		return nil
+	end
+
+	local contains_kanji = opts.contains_kanji or function() return false end
+
+	local function try_verb_rules(surface, stripped_bytes, kind)
+		for _, verb in ipairs(Conjugations.verb_endings) do
+			local p = verb.ending
+			if (not verb.kanji_surface_only or contains_kanji(surface))
+				and Conjugations.is_valid_verb_match(surface, p, verb.rep)
+				and surface:sub(-#p) == p then
+				local stripped = surface:sub(1, -(#p + 1)) .. verb.rep
+				if #stripped >= 3 then
+					local r1, r2, r3, r4 = callback_deconjugated_base(stripped, stripped_bytes, kind, callback)
+					if r1 ~= nil then return r1, r2, r3, r4 end
+				end
+			end
+		end
+		return nil
+	end
+
+	for _, p in ipairs(Conjugations.noun_suffixes) do
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1))
+			if #stripped >= 3 then
+				local r1, r2, r3, r4 = callback_deconjugated_base(stripped, #p, "suffix_strip", callback)
+				if r1 ~= nil then return r1, r2, r3, r4 end
+			end
+		end
+	end
+
+	for _, adj in ipairs(Conjugations.adj_endings) do
+		local p = adj.ending
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1)) .. adj.rep
+			if #stripped >= 3 and not Conjugations.is_invalid_adj_base(term, stripped) then
+				local match_strip_bytes = p:sub(-#"です") == "です" and #"です" or 0
+				local match_kind = match_strip_bytes > 0 and "suffix_strip" or "inflection"
+				local r1, r2, r3, r4 =
+					callback_deconjugated_base(stripped, match_strip_bytes, match_kind, callback)
+				if r1 ~= nil then return r1, r2, r3, r4 end
+			end
+		end
+	end
+
+	for _, p in ipairs(Conjugations.na_adj_endings) do
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1))
+			if #stripped >= 3 then
+				local r1, r2, r3, r4 = callback_deconjugated_base(stripped, #p, "suffix_strip", callback)
+				if r1 ~= nil then return r1, r2, r3, r4 end
+			end
+		end
+	end
+
+	for _, suffix in ipairs(Conjugations.verb_particle_suffixes or {}) do
+		if #term > #suffix and term:sub(-#suffix) == suffix then
+			local stripped_surface = term:sub(1, -(#suffix + 1))
+			local r1, r2, r3, r4 = try_verb_rules(stripped_surface, #suffix, "suffix_strip")
+			if r1 ~= nil then return r1, r2, r3, r4 end
+		end
+	end
+
+	return try_verb_rules(term, 0, "inflection")
+end
+
+function Conjugations.each_kana_adj_reading_term(term, opts, callback)
+	if type(opts) == "function" and callback == nil then
+		callback = opts
+		opts = {}
+	end
+	opts = opts or {}
+
+	if type(term) ~= "string" or term == "" then
+		return nil
+	end
+
+	local is_kana_only_fn = opts.is_kana_only or function() return false end
+
+	for _, adj in ipairs(Conjugations.adj_endings) do
+		local p = adj.ending
+		if #term > #p and term:sub(-#p) == p then
+			local stripped = term:sub(1, -(#p + 1)) .. adj.rep
+			if #stripped >= 3
+				and is_kana_only_fn(stripped)
+				and Conjugations.is_invalid_adj_base(term, stripped) then
+				local r1, r2, r3, r4 = callback(stripped, 0, "inflection")
+				if r1 ~= nil then return r1, r2, r3, r4 end
+			end
+		end
+	end
+
+	return nil
 end
 
 local na_adj_endings = {
@@ -185,6 +321,8 @@ sort_string_rules(na_adj_endings)
 Conjugations.na_adj_endings = na_adj_endings
 
 local verb_endings = {
+	{ ending = "来た", rep = "来る" },
+	{ ending = "来て", rep = "来る" },
 	{ ending = "いたくなかった", rep = "う" },
 	{ ending = "いませんでした", rep = "う" },
 	{ ending = "きたくなかった", rep = "く" },
@@ -211,19 +349,27 @@ local verb_endings = {
 	{ ending = "いてしまって", rep = "く" },
 	{ ending = "いでしまった", rep = "ぐ" },
 	{ ending = "いでしまって", rep = "ぐ" },
+	{ ending = "いじゃなかった", rep = "ぐ" },
+	{ ending = "いじゃったら", rep = "ぐ" },
+	{ ending = "いじゃった", rep = "ぐ" },
+	{ ending = "いじゃって", rep = "ぐ" },
 	{ ending = "かせなかった", rep = "く" },
+	{ ending = "かせて", rep = "く" },
 	{ ending = "かなかったら", rep = "く" },
 	{ ending = "かれなかった", rep = "く" },
 	{ ending = "がせなかった", rep = "ぐ" },
+	{ ending = "がせて", rep = "ぐ" },
 	{ ending = "がなかったら", rep = "ぐ" },
 	{ ending = "がれなかった", rep = "ぐ" },
 	{ ending = "させなかった", rep = "す" },
+	{ ending = "させて", rep = "す" },
 	{ ending = "さなかったら", rep = "す" },
 	{ ending = "されなかった", rep = "す" },
 	{ ending = "してしまった", rep = "す" },
 	{ ending = "してしまって", rep = "す" },
 	{ ending = "たくなかった", rep = "る" },
 	{ ending = "たせなかった", rep = "つ" },
+	{ ending = "たせて", rep = "つ" },
 	{ ending = "たなかったら", rep = "つ" },
 	{ ending = "たれなかった", rep = "つ" },
 	{ ending = "ってしまった", rep = "う" },
@@ -233,21 +379,32 @@ local verb_endings = {
 	{ ending = "ってしまって", rep = "つ" },
 	{ ending = "ってしまって", rep = "る" },
 	{ ending = "なせなかった", rep = "ぬ" },
+	{ ending = "なせて", rep = "ぬ" },
 	{ ending = "ななかったら", rep = "ぬ" },
 	{ ending = "なれなかった", rep = "ぬ" },
 	{ ending = "ばせなかった", rep = "ぶ" },
+	{ ending = "ばせて", rep = "ぶ" },
 	{ ending = "ばなかったら", rep = "ぶ" },
 	{ ending = "ばれなかった", rep = "ぶ" },
 	{ ending = "ませなかった", rep = "む" },
+	{ ending = "ませて", rep = "む" },
 	{ ending = "ませんでした", rep = "る" },
 	{ ending = "まなかったら", rep = "む" },
 	{ ending = "まれなかった", rep = "む" },
 	{ ending = "らせなかった", rep = "る" },
 	{ ending = "らなかったら", rep = "る" },
 	{ ending = "られなかった", rep = "る" },
+	{ ending = "らせて", rep = "る" },
+	{ ending = "らせる", rep = "る" },
+	{ ending = "らせた", rep = "る" },
 	{ ending = "わせなかった", rep = "う" },
+	{ ending = "わせて", rep = "う" },
 	{ ending = "わなかったら", rep = "う" },
 	{ ending = "われなかった", rep = "う" },
+	{ ending = "われていた", rep = "う" },
+	{ ending = "われている", rep = "う" },
+	{ ending = "われてた", rep = "う" },
+	{ ending = "われてる", rep = "う" },
 	{ ending = "んでしまった", rep = "ぬ" },
 	{ ending = "んでしまった", rep = "ぶ" },
 	{ ending = "んでしまった", rep = "む" },
@@ -265,6 +422,7 @@ local verb_endings = {
 	{ ending = "いてしまう", rep = "く" },
 	{ ending = "いでおいた", rep = "ぐ" },
 	{ ending = "いでしまう", rep = "ぐ" },
+	{ ending = "いじゃう", rep = "ぐ" },
 	{ ending = "いましたら", rep = "う" },
 	{ ending = "えなかった", rep = "う" },
 	{ ending = "かなかった", rep = "く" },
@@ -378,6 +536,7 @@ local verb_endings = {
 	{ ending = "いまして", rep = "う" },
 	{ ending = "いません", rep = "う" },
 	{ ending = "いません", rep = "る" },
+	{ ending = "いましょう", rep = "う" },
 	{ ending = "いやがる", rep = "う" },
 	{ ending = "かせない", rep = "く" },
 	{ ending = "かないで", rep = "く" },
@@ -397,12 +556,15 @@ local verb_endings = {
 	{ ending = "きまして", rep = "く" },
 	{ ending = "きません", rep = "く" },
 	{ ending = "きません", rep = "くる" },
+	{ ending = "きましょう", rep = "く" },
+	{ ending = "きましょう", rep = "くる" },
 	{ ending = "きやがる", rep = "く" },
 	{ ending = "ぎたくて", rep = "ぐ" },
 	{ ending = "ぎなさい", rep = "ぐ" },
 	{ ending = "ぎました", rep = "ぐ" },
 	{ ending = "ぎまして", rep = "ぐ" },
 	{ ending = "ぎません", rep = "ぐ" },
+	{ ending = "ぎましょう", rep = "ぐ" },
 	{ ending = "ぎやがる", rep = "ぐ" },
 	{ ending = "こさせる", rep = "くる" },
 	{ ending = "こなくて", rep = "くる" },
@@ -424,6 +586,11 @@ local verb_endings = {
 	{ ending = "してから", rep = "する" },
 	{ ending = "してきた", rep = "す" },
 	{ ending = "してくる", rep = "す" },
+	{ ending = "しといた", rep = "する" },
+	{ ending = "しといて", rep = "する" },
+	{ ending = "しとく", rep = "する" },
+	{ ending = "しとけ", rep = "する" },
+	{ ending = "しとこう", rep = "する" },
 	{ ending = "してたら", rep = "す" },
 	{ ending = "してたら", rep = "する" },
 	{ ending = "してたり", rep = "す" },
@@ -436,10 +603,13 @@ local verb_endings = {
 	{ ending = "しまして", rep = "する" },
 	{ ending = "しません", rep = "す" },
 	{ ending = "しません", rep = "する" },
+	{ ending = "しましょう", rep = "す" },
+	{ ending = "しましょう", rep = "する" },
 	{ ending = "しやがる", rep = "す" },
 	{ ending = "たかった", rep = "る" },
 	{ ending = "たくって", rep = "る" },
 	{ ending = "たくない", rep = "る" },
+	{ ending = "れちゃった", rep = "る" },
 	{ ending = "たせない", rep = "つ" },
 	{ ending = "たないで", rep = "つ" },
 	{ ending = "たなくて", rep = "つ" },
@@ -449,11 +619,21 @@ local verb_endings = {
 	{ ending = "ちました", rep = "つ" },
 	{ ending = "ちまして", rep = "つ" },
 	{ ending = "ちません", rep = "つ" },
+	{ ending = "ちましょう", rep = "つ" },
 	{ ending = "ちゃった", rep = "る" },
 	{ ending = "ちやがる", rep = "つ" },
 	{ ending = "ったって", rep = "う" },
 	{ ending = "ったって", rep = "つ" },
 	{ ending = "ったって", rep = "る" },
+	{ ending = "っちゃった", rep = "う" },
+	{ ending = "っちゃった", rep = "つ" },
+	{ ending = "っちゃった", rep = "る" },
+	{ ending = "っちゃって", rep = "う" },
+	{ ending = "っちゃって", rep = "つ" },
+	{ ending = "っちゃって", rep = "る" },
+	{ ending = "っちゃう", rep = "う" },
+	{ ending = "っちゃう", rep = "つ" },
+	{ ending = "っちゃう", rep = "る" },
 	{ ending = "っていく", rep = "う" },
 	{ ending = "っていく", rep = "つ" },
 	{ ending = "っていく", rep = "る" },
@@ -494,6 +674,7 @@ local verb_endings = {
 	{ ending = "にました", rep = "ぬ" },
 	{ ending = "にまして", rep = "ぬ" },
 	{ ending = "にません", rep = "ぬ" },
+	{ ending = "にましょう", rep = "ぬ" },
 	{ ending = "にやがる", rep = "ぬ" },
 	{ ending = "ばせない", rep = "ぶ" },
 	{ ending = "ばないで", rep = "ぶ" },
@@ -504,6 +685,7 @@ local verb_endings = {
 	{ ending = "びました", rep = "ぶ" },
 	{ ending = "びまして", rep = "ぶ" },
 	{ ending = "びません", rep = "ぶ" },
+	{ ending = "びましょう", rep = "ぶ" },
 	{ ending = "びやがる", rep = "ぶ" },
 	{ ending = "ませない", rep = "む" },
 	{ ending = "まないで", rep = "む" },
@@ -514,6 +696,7 @@ local verb_endings = {
 	{ ending = "みました", rep = "む" },
 	{ ending = "みまして", rep = "む" },
 	{ ending = "みません", rep = "む" },
+	{ ending = "みましょう", rep = "む" },
 	{ ending = "みやがる", rep = "む" },
 	{ ending = "らせない", rep = "る" },
 	{ ending = "らないで", rep = "る" },
@@ -524,6 +707,7 @@ local verb_endings = {
 	{ ending = "りました", rep = "る" },
 	{ ending = "りまして", rep = "る" },
 	{ ending = "りません", rep = "る" },
+	{ ending = "りましょう", rep = "る" },
 	{ ending = "りやがる", rep = "る" },
 	{ ending = "わせない", rep = "う" },
 	{ ending = "わないで", rep = "う" },
@@ -572,27 +756,25 @@ local verb_endings = {
 	{ ending = "いって", rep = "いく" },
 	{ ending = "いてた", rep = "く" },
 	{ ending = "いては", rep = "く" },
-	{ ending = "いても", rep = "く" },
 	{ ending = "いてる", rep = "く" },
 	{ ending = "いでた", rep = "ぐ" },
 	{ ending = "いでは", rep = "ぐ" },
-	{ ending = "いでも", rep = "ぐ" },
 	{ ending = "いでる", rep = "ぐ" },
 	{ ending = "います", rep = "う" },
 	{ ending = "います", rep = "る" },
 	{ ending = "いませ", rep = "る" },
 	{ ending = "えない", rep = "う" },
 	{ ending = "かなきゃ", rep = "く" },
+	{ ending = "かなければ", rep = "く" },
 	{ ending = "かなくちゃ", rep = "く" },
-	{ ending = "かずに", rep = "く" },
 	{ ending = "かせた", rep = "く" },
 	{ ending = "かせる", rep = "く" },
 	{ ending = "かない", rep = "く" },
 	{ ending = "かれた", rep = "く" },
 	{ ending = "かれる", rep = "く" },
 	{ ending = "がなきゃ", rep = "ぐ" },
+	{ ending = "がなければ", rep = "ぐ" },
 	{ ending = "がなくちゃ", rep = "ぐ" },
-	{ ending = "がずに", rep = "ぐ" },
 	{ ending = "がせた", rep = "ぐ" },
 	{ ending = "がせる", rep = "ぐ" },
 	{ ending = "がない", rep = "ぐ" },
@@ -602,7 +784,6 @@ local verb_endings = {
 	{ ending = "きたら", rep = "くる" },
 	{ ending = "きたり", rep = "くる" },
 	{ ending = "きてた", rep = "くる" },
-	{ ending = "きても", rep = "くる" },
 	{ ending = "きてる", rep = "くる" },
 	{ ending = "きます", rep = "く" },
 	{ ending = "きます", rep = "くる" },
@@ -612,15 +793,18 @@ local verb_endings = {
 	{ ending = "けない", rep = "く" },
 	{ ending = "げない", rep = "ぐ" },
 	{ ending = "こなきゃ", rep = "くる" },
+	{ ending = "こなければ", rep = "くる" },
 	{ ending = "こなくちゃ", rep = "くる" },
 	{ ending = "こない", rep = "くる" },
 	{ ending = "こよう", rep = "くる" },
 	{ ending = "さなきゃ", rep = "す" },
+	{ ending = "さなければ", rep = "す" },
 	{ ending = "さなくちゃ", rep = "す" },
-	{ ending = "さずに", rep = "す" },
 	{ ending = "させた", rep = "す" },
 	{ ending = "させた", rep = "する" },
+	{ ending = "させて", rep = "する" },
 	{ ending = "させた", rep = "る" },
+	{ ending = "させて", rep = "る" },
 	{ ending = "させて", rep = "する" },
 	{ ending = "させる", rep = "す" },
 	{ ending = "させる", rep = "する" },
@@ -642,11 +826,11 @@ local verb_endings = {
 	{ ending = "してた", rep = "する" },
 	{ ending = "しては", rep = "す" },
 	{ ending = "しては", rep = "する" },
-	{ ending = "しても", rep = "す" },
-	{ ending = "しても", rep = "する" },
 	{ ending = "してる", rep = "す" },
 	{ ending = "してる", rep = "する" },
 	{ ending = "しなきゃ", rep = "する" },
+	{ ending = "しなければ", rep = "す" },
+	{ ending = "しなければ", rep = "する" },
 	{ ending = "しなくちゃ", rep = "する" },
 	{ ending = "しない", rep = "する" },
 	{ ending = "します", rep = "す" },
@@ -657,8 +841,8 @@ local verb_endings = {
 	{ ending = "せない", rep = "す" },
 	{ ending = "たくて", rep = "る" },
 	{ ending = "たなきゃ", rep = "つ" },
+	{ ending = "たなければ", rep = "つ" },
 	{ ending = "たなくちゃ", rep = "つ" },
-	{ ending = "たずに", rep = "つ" },
 	{ ending = "たせた", rep = "つ" },
 	{ ending = "たせる", rep = "つ" },
 	{ ending = "たって", rep = "る" },
@@ -680,9 +864,6 @@ local verb_endings = {
 	{ ending = "っては", rep = "う" },
 	{ ending = "っては", rep = "つ" },
 	{ ending = "っては", rep = "る" },
-	{ ending = "っても", rep = "う" },
-	{ ending = "っても", rep = "つ" },
-	{ ending = "っても", rep = "る" },
 	{ ending = "ってる", rep = "う" },
 	{ ending = "ってる", rep = "つ" },
 	{ ending = "ってる", rep = "る" },
@@ -695,13 +876,14 @@ local verb_endings = {
 	{ ending = "てたら", rep = "る" },
 	{ ending = "てない", rep = "つ" },
 	{ ending = "なきゃ", rep = "る" },
+	{ ending = "なければ", rep = "る" },
 	{ ending = "なくちゃ", rep = "る" },
 	{ ending = "ないで", rep = "る" },
 	{ ending = "なくて", rep = "る" },
 	{ ending = "なさい", rep = "る" },
 	{ ending = "ななきゃ", rep = "ぬ" },
+	{ ending = "ななければ", rep = "ぬ" },
 	{ ending = "ななくちゃ", rep = "ぬ" },
-	{ ending = "なずに", rep = "ぬ" },
 	{ ending = "なせた", rep = "ぬ" },
 	{ ending = "なせる", rep = "ぬ" },
 	{ ending = "なない", rep = "ぬ" },
@@ -711,8 +893,8 @@ local verb_endings = {
 	{ ending = "にます", rep = "ぬ" },
 	{ ending = "ねない", rep = "ぬ" },
 	{ ending = "ばなきゃ", rep = "ぶ" },
+	{ ending = "ばなければ", rep = "ぶ" },
 	{ ending = "ばなくちゃ", rep = "ぶ" },
-	{ ending = "ばずに", rep = "ぶ" },
 	{ ending = "ばせた", rep = "ぶ" },
 	{ ending = "ばせる", rep = "ぶ" },
 	{ ending = "ばない", rep = "ぶ" },
@@ -724,8 +906,8 @@ local verb_endings = {
 	{ ending = "ました", rep = "る" },
 	{ ending = "まして", rep = "る" },
 	{ ending = "まなきゃ", rep = "む" },
+	{ ending = "まなければ", rep = "む" },
 	{ ending = "まなくちゃ", rep = "む" },
-	{ ending = "まずに", rep = "む" },
 	{ ending = "ませた", rep = "む" },
 	{ ending = "ませる", rep = "む" },
 	{ ending = "ません", rep = "る" },
@@ -736,19 +918,21 @@ local verb_endings = {
 	{ ending = "みます", rep = "む" },
 	{ ending = "めない", rep = "む" },
 	{ ending = "らなきゃ", rep = "る" },
+	{ ending = "らなければ", rep = "る" },
 	{ ending = "らなくちゃ", rep = "る" },
-	{ ending = "らずに", rep = "る" },
 	{ ending = "らせた", rep = "る" },
 	{ ending = "らせる", rep = "る" },
 	{ ending = "らない", rep = "る" },
 	{ ending = "られた", rep = "る" },
 	{ ending = "られる", rep = "る" },
+	{ ending = "られなく", rep = "る" },
 	{ ending = "りたい", rep = "る" },
 	{ ending = "ります", rep = "る" },
 	{ ending = "れない", rep = "る" },
+	{ ending = "れなく", rep = "る" },
 	{ ending = "わなきゃ", rep = "う" },
+	{ ending = "わなければ", rep = "う" },
 	{ ending = "わなくちゃ", rep = "う" },
-	{ ending = "わずに", rep = "う" },
 	{ ending = "わせた", rep = "う" },
 	{ ending = "わせる", rep = "う" },
 	{ ending = "わない", rep = "う" },
@@ -766,13 +950,11 @@ local verb_endings = {
 	{ ending = "んでは", rep = "ぬ" },
 	{ ending = "んでは", rep = "ぶ" },
 	{ ending = "んでは", rep = "む" },
-	{ ending = "んでも", rep = "ぬ" },
-	{ ending = "んでも", rep = "ぶ" },
-	{ ending = "んでも", rep = "む" },
 	{ ending = "んでる", rep = "ぬ" },
 	{ ending = "んでる", rep = "ぶ" },
 	{ ending = "んでる", rep = "む" },
 	{ ending = "いき", rep = "いく" },
+	{ ending = "え", rep = "う", kanji_surface_only = true },
 	{ ending = "いた", rep = "く" },
 	{ ending = "いだ", rep = "ぐ" },
 	{ ending = "いて", rep = "く" },
@@ -804,7 +986,6 @@ local verb_endings = {
 	{ ending = "して", rep = "する" },
 	{ ending = "しよ", rep = "する" },
 	{ ending = "しろ", rep = "する" },
-	{ ending = "ずに", rep = "る" },
 	{ ending = "せず", rep = "する" },
 	{ ending = "せた", rep = "す" },
 	{ ending = "せて", rep = "す" },
@@ -814,6 +995,7 @@ local verb_endings = {
 	{ ending = "そう", rep = "す" },
 	{ ending = "たい", rep = "る" },
 	{ ending = "たず", rep = "つ" },
+	{ ending = "た", rep = "る" },
 	{ ending = "たら", rep = "る" },
 	{ ending = "たり", rep = "る" },
 	{ ending = "ちゃ", rep = "る" },
@@ -826,9 +1008,9 @@ local verb_endings = {
 	{ ending = "てた", rep = "つ" },
 	{ ending = "てた", rep = "る" },
 	{ ending = "てて", rep = "つ" },
+	{ ending = "て", rep = "る" },
 	{ ending = "ては", rep = "る" },
 	{ ending = "てば", rep = "つ" },
-	{ ending = "ても", rep = "る" },
 	{ ending = "てる", rep = "つ" },
 	{ ending = "てる", rep = "る" },
 	{ ending = "とう", rep = "つ" },
@@ -867,22 +1049,6 @@ local verb_endings = {
 	{ ending = "んで", rep = "ぬ" },
 	{ ending = "んで", rep = "ぶ" },
 	{ ending = "んで", rep = "む" },
-	{ ending = "い", rep = "う" },
-	{ ending = "き", rep = "く" },
-	{ ending = "き", rep = "くる" },
-	{ ending = "ぎ", rep = "ぐ" },
-	{ ending = "し", rep = "す" },
-	{ ending = "し", rep = "する" },
-	{ ending = "ず", rep = "る" },
-	{ ending = "た", rep = "る" },
-	{ ending = "ち", rep = "つ" },
-	{ ending = "て", rep = "る" },
-	{ ending = "に", rep = "ぬ" },
-	{ ending = "び", rep = "ぶ" },
-	{ ending = "み", rep = "む" },
-	{ ending = "よ", rep = "る" },
-	{ ending = "り", rep = "る" },
-	{ ending = "ろ", rep = "る" },
 }
 sort_pair_rules(verb_endings)
 Conjugations.verb_endings = verb_endings

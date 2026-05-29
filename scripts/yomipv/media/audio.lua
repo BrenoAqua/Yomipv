@@ -27,8 +27,8 @@ function Audio.create_job(subtitle)
 		return nil
 	end
 
-	local offset = Audio.config.audio_offset or 0
-	local end_offset = Audio.config.audio_end_offset or 0
+	local offset = (not subtitle.is_manual_range) and (Audio.config.audio_offset or 0) or 0
+	local end_offset = (not subtitle.is_manual_range) and (Audio.config.audio_end_offset or 0) or 0
 	local start_time = math.max(0, (subtitle.start or 0) + offset)
 	local end_time = (subtitle["end"] or 0) + end_offset
 

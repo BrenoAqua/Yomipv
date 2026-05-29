@@ -171,10 +171,11 @@ function SecondarySid.cycle_track(direction)
 
 	local sub_tracks = {}
 	local current_index = 0
+	local current_sid = mp.get_property_number("sid") or 0
 	local secondary_sid = tonumber(mp.get_property("secondary-sid"))
 
 	for _, track in ipairs(tracks) do
-		if track.type == "sub" then
+		if track.type == "sub" and track.id ~= current_sid then
 			table.insert(sub_tracks, track)
 			if secondary_sid and track.id == secondary_sid then
 				current_index = #sub_tracks
@@ -183,7 +184,7 @@ function SecondarySid.cycle_track(direction)
 	end
 
 	if #sub_tracks == 0 then
-		msg.warn("No subtitle tracks available to cycle")
+		msg.warn("No secondary subtitle tracks available to cycle")
 		return
 	end
 
@@ -198,8 +199,8 @@ function SecondarySid.cycle_track(direction)
 	else
 		if new_index > #sub_tracks then
 			new_index = 0
-		elseif new_index < 0 then
-			new_index = #sub_tracks
+		elseif new_index < 1 then
+			new_index = 0
 		end
 	end
 

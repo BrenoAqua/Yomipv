@@ -30,6 +30,12 @@ selector_colorize_words=yes
 selector_colorize_underline=no
 ```
 
+### Subtitle Language
+
+The colorizer only replaces mpv subtitles when the primary subtitle track is Japanese. It uses the track language tag when available (`ja`, `jp`, `jpn`, `japanese`, or `日本語`). If the track has no language tag, it falls back to detecting Japanese characters in the subtitle text
+
+For non-Japanese primary subtitle tracks, normal mpv subtitles stay visible and the colorizer overlay is not shown
+
 ### Synchronization
 
 The colorizer relies on a local snapshot of your Anki database (`anki_words.json`) for performance. You must manually trigger a rebuild of this database to sync your latest Anki progress
@@ -42,9 +48,10 @@ Pressing this key will fetch your current card intervals and statuses from Anki 
 
 1. **AnkiConnect**: Ensure Anki is open with the AnkiConnect add-on installed and configured
 2. **Database Build**: You must press the `B` key at least once to generate the initial database
-3. **Fields**: Ensure `ankidb_fields` in your configuration correctly maps to the fields in your Anki note types that contain the Japanese expression
+3. **Fields**: Ensure `ankidb_word_fields` maps to the fields in your Anki note types that contain the Japanese expression. Optionally set `ankidb_reading_fields` to fields that contain readings, which makes kana matching more accurate
 
 ```ini
 # Example field mapping for database building
-ankidb_fields=word Word expression Expression
+ankidb_word_fields=word Word expression Expression
+ankidb_reading_fields=reading Reading "Word Reading"
 ```

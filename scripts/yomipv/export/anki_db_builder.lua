@@ -10,6 +10,96 @@ local AnkiDBBuilder = {}
 
 local BATCH_SIZE = 50
 
+local function trim(text)
+	if type(text) ~= "string" then return nil end
+	local trimmed = text:gsub("^%s*(.-)%s*$", "%1")
+	return trimmed ~= "" and trimmed or nil
+end
+
+local function parse_field_list(raw)
+	local fields = {}
+	local text = trim(raw)
+	if not text then
+		return fields
+	end
+
+	local i = 1
+	while i <= #text do
+		while i <= #text and text:sub(i, i):match("%s") do
+			i = i + 1
+		end
+		if i > #text then
+			break
+		end
+
+		local char = text:sub(i, i)
+		if char == '"' or char == "'" then
+			local quote = char
+			local j = i + 1
+			while j <= #text and text:sub(j, j) ~= quote do
+				j = j + 1
+			end
+			local value = trim(text:sub(i + 1, j - 1))
+			if value then
+				table.insert(fields, value)
+			end
+			i = j + 1
+		else
+			local j = i
+			while j <= #text and not text:sub(j, j):match("%s") do
+				j = j + 1
+			end
+			local value = trim(text:sub(i, j - 1))
+			if value then
+				table.insert(fields, value)
+			end
+			i = j
+		end
+	end
+
+	return fields
+end
+
+local function get_word_fields(config)
+	return parse_field_list(config.ankidb_word_fields)
+end
+
+local function get_reading_fields(config)
+	local raw = config.ankidb_reading_fields
+	if trim(raw) then
+		return parse_field_list(raw)
+	end
+
+	local reading_field = trim(config.reading_field)
+	if reading_field then
+		return { reading_field }
+	end
+
+	return {}
+end
+
+local function add_reading(entry, reading)
+	if not reading then
+		return
+	end
+
+	if type(entry.reading) == "string" then
+		if entry.reading == reading then
+			return
+		end
+		entry.reading = { entry.reading, reading }
+	elseif type(entry.reading) == "table" then
+		for _, existing in ipairs(entry.reading) do
+			if existing == reading then
+				return
+			end
+		end
+		table.insert(entry.reading, reading)
+	else
+		entry.reading = { reading }
+	end
+end
+
 function AnkiDBBuilder.new(config, anki)
 	local obj = {
 		config = config,
@@ -20,10 +110,8 @@ function AnkiDBBuilder.new(config, anki)
 end
 
 function AnkiDBBuilder:build(callback)
-	local fields = {}
-	for field in self.config.ankidb_fields:gmatch("%S+") do
-		table.insert(fields, field)
-	end
+	local fields = get_word_fields(self.config)
+	local reading_fields = get_reading_fields(self.config)
 
 	if #fields == 0 then
 		return callback(false, "No fields configured for Anki database build")
@@ -54,7 +142,7 @@ function AnkiDBBuilder:build(callback)
 
 		local function process_cards_batch(index)
 			if index > total_cards then
-				return self:process_notes(note_data, fields, callback)
+				return self:process_notes(note_data, fields, reading_fields, callback)
 			end
 
 			local batch = {}
@@ -105,7 +193,7 @@ function AnkiDBBuilder:build(callback)
 	end)
 end
 
-function AnkiDBBuilder:process_notes(note_data, fields, callback)
+function AnkiDBBuilder:process_notes(note_data, fields, reading_fields, callback)
 	local note_ids = {}
 	for nid, _ in pairs(note_data) do
 		table.insert(note_ids, nid)
@@ -133,12 +221,23 @@ function AnkiDBBuilder:process_notes(note_data, fields, callback)
 				local nid = tonumber(note.noteId)
 				local note_fields = note.fields
 				local word = nil
+				local reading = nil
 
 				for _, f in ipairs(fields) do
 					local field_data = note_fields[f]
 					if field_data and field_data.value and field_data.value:gsub("%s+", "") ~= "" then
-						word = field_data.value:gsub("^%s*(.-)%s*$", "%1") -- Trim
+						word = trim(field_data.value)
 						break
+					end
+				end
+
+				for _, reading_field in ipairs(reading_fields) do
+					local field_data = note_fields[reading_field]
+					if field_data and field_data.value then
+						reading = trim(field_data.value)
+						if reading then
+							break
+						end
 					end
 				end
 
@@ -146,12 +245,14 @@ function AnkiDBBuilder:process_notes(note_data, fields, callback)
 					local res = note_data[nid]
 					if not word_data[word] then
 						word_data[word] = { interval = res.interval, state = res.state }
+						add_reading(word_data[word], reading)
 					else
 						local existing = word_data[word]
 						if res.interval > existing.interval then
 							existing.interval = res.interval
 							existing.state = res.state
 						end
+						add_reading(existing, reading)
 					end
 				end
 			end

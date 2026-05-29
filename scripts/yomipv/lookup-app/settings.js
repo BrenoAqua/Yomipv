@@ -46,7 +46,18 @@ const fieldConfigs = {
     { type: 'header', label: 'AnkiConnect' },
     { key: 'ankiconnect_url', label: 'AnkiConnect URL', type: 'text' },
     { key: 'ankiconnect_api_key', label: 'API Key', type: 'password' },
-    { key: 'ankidb_fields', label: 'Anki DB build settings', type: 'text' },
+    {
+      key: 'ankidb_word_fields',
+      label: 'Anki DB Word Fields',
+      type: 'text',
+      desc: 'Separate field names with spaces. Quote field names that contain spaces'
+    },
+    {
+      key: 'ankidb_reading_fields',
+      label: 'Anki DB Reading Fields',
+      type: 'text',
+      desc: 'Separate field names with spaces. Quote field names that contain spaces'
+    },
     { key: 'update_if_exists', label: 'Update if exists', type: 'checkbox', desc: 'Append media if card already exists' },
     { key: 'refresh_gui_after_update', label: 'Refresh Anki GUI', type: 'checkbox', desc: 'Reload Anki browser after export' },
 

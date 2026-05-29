@@ -4,11 +4,14 @@
 local mp = require("mp")
 local msg = require("mp.msg")
 local Prefetcher = require("subtitle.prefetcher")
+local SubtitleLanguage = require("subtitle.language")
 
 local Observer = {
 	monitor = nil,
 	active = false,
 }
+
+local COLORIZER_LOOKAHEAD_FRAMES = 1.07
 
 -- Initialize subtitle observer state
 function Observer.init(handler, yomitan, config)
@@ -40,9 +43,20 @@ function Observer.handle_subtitle_change(name, value, is_proactive)
 	local StringOps = require("lib.string_ops")
 	local cleaned = StringOps.clean_subtitle(text, true)
 
-	-- Limit colorizer path to primary sub-text or proactive pre-render
-	local is_colorizer_path = (is_proactive or name == "sub-text")
+	-- Limit colorizer path to Japanese primary subtitles
+	local colorizer_candidate = (is_proactive or name == "sub-text")
 		and Observer.config and Observer.config.colorizer_enabled and Observer.yomitan
+	local is_colorizer_path = colorizer_candidate
+		and SubtitleLanguage.is_primary_subtitle_japanese(cleaned)
+	if colorizer_candidate and not is_colorizer_path then
+		if Observer._last_handled_text and Observer._last_handled_text ~= "" then
+			Observer._last_handled_text = ""
+			if Observer.handler and Observer.handler.clear_passive then
+				Observer.handler:clear_passive()
+			end
+		end
+		mp.set_property("sub-visibility", "yes")
+	end
 	if is_colorizer_path then
 		if Observer._last_handled_text ~= cleaned then
 			Observer._last_handled_text = cleaned
@@ -141,12 +155,15 @@ function Observer.handle_time_pos(_, time_pos)
 	if fps <= 0 then fps = 24 end
 	local frame_duration = 1.0 / fps
 
-	-- Look ahead 1 frame to offset OSD render latency
-	local lookahead_time = time_pos + frame_duration
+	-- Look ahead far enough for the OSD update to land on the subtitle frame
+	local lookahead_time = time_pos + (frame_duration * COLORIZER_LOOKAHEAD_FRAMES)
+	local timing_epsilon = 0.001
 
 	local active_text = ""
 	for _, entry in ipairs(Prefetcher._entries) do
-		if lookahead_time >= (entry.start_s + sub_delay) and time_pos <= (entry.end_s + sub_delay) then
+		local start_time = entry.start_s + sub_delay
+		local end_time = entry.end_s + sub_delay
+		if (lookahead_time + timing_epsilon) >= start_time and time_pos <= end_time then
 			active_text = entry.text
 			break
 		end
@@ -154,10 +171,27 @@ function Observer.handle_time_pos(_, time_pos)
 
 	local StringOps = require("lib.string_ops")
 	local cleaned = StringOps.clean_subtitle(active_text, true)
+	if cleaned ~= "" and not SubtitleLanguage.is_primary_subtitle_japanese(cleaned) then
+		if Observer._last_handled_text and Observer._last_handled_text ~= "" then
+			Observer._last_handled_text = ""
+			if Observer.handler and Observer.handler.clear_passive then
+				Observer.handler:clear_passive()
+			end
+		end
+		return
+	end
 
 	-- Restrict proactive triggers to visible subtitles
-	-- Defer clearing to native sub-text observer to respect mpv sub-fix-timing extensions
-	if cleaned ~= "" and Observer._last_handled_text ~= cleaned then
+	if cleaned == "" then
+		local current = mp.get_property("sub-text", "")
+		local current_cleaned = StringOps.clean_subtitle(current, true)
+		if current_cleaned == "" and Observer._last_handled_text and Observer._last_handled_text ~= "" then
+			Observer._last_handled_text = ""
+			if Observer.handler and Observer.handler.clear_passive then
+				Observer.handler:clear_passive()
+			end
+		end
+	elseif Observer._last_handled_text ~= cleaned then
 		Observer.handle_subtitle_change("proactive", active_text, true)
 	end
 end

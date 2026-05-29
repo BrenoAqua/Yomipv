@@ -74,7 +74,7 @@ body.visible #history-container {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .header-actions button {
@@ -90,20 +90,12 @@ body.visible #history-container {
   white-space: nowrap;
 }
 
-.header-actions button:hover,
-.header-actions button.active {
+.header-actions button:hover {
   color: #ffffff;
 }
 
-.header-dropdown {
-  position: relative;
-}
-
-[hidden] {
-  display: none !important;
-}
-
-#history-menu-toggle,
+.header-icon-button,
+#clear-history,
 #open-settings {
   min-width: 30px;
   height: 30px;
@@ -114,28 +106,19 @@ body.visible #history-container {
   padding: 0 8px;
 }
 
-#history-menu-toggle {
-  padding: 0;
+#clear-history svg,
+.header-icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.menu-dots {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 100%;
-}
-
-.menu-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background-color: currentColor;
-  display: block;
-}
-
-#history-menu-toggle:hover,
-#history-menu-toggle.active,
+.header-icon-button:hover,
+#clear-history:hover,
 #open-settings:hover {
   background-color: rgba(255, 255, 255, 0.08);
 }
@@ -144,33 +127,34 @@ body.visible #history-container {
   font-size: 18px;
 }
 
-.history-menu {
+.header-icon-button {
+  position: relative;
+}
+
+.state-slash {
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 154px;
-  padding: 6px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg-color-hex), #181818 40%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  z-index: 20;
+  width: 20px;
+  height: 2px;
+  border-radius: 999px;
+  background-color: currentColor;
+  transform: rotate(-42deg);
+  opacity: 0.9;
 }
 
-.history-menu button {
-  width: 100%;
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 8px;
-  text-align: left;
-  letter-spacing: 0.6px;
+#anim-toggle.active .state-slash {
+  opacity: 0;
 }
 
-.history-menu button:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+.icon-current-pos {
+  display: none;
+}
+
+.time-current .icon-sub-start {
+  display: none;
+}
+
+.time-current .icon-current-pos {
+  display: block;
 }
 
 #history-scroll-clip {
