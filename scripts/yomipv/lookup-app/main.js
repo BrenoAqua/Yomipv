@@ -663,7 +663,14 @@ ipcMain.on('dictionary-selected', (event, content) => {
 
 ipcMain.on('active-entry', (event, data) => {
   if (data) {
-    sendMpvMessage('script-message', 'yomipv-active-entry', data.expression || '', data.reading || '');
+    sendMpvMessage(
+      'script-message',
+      'yomipv-active-entry',
+      data.expression || '',
+      data.reading || '',
+      String(data.originalLength || 0),
+      String(data.lookupRequestId || 0)
+    );
   }
 });
 

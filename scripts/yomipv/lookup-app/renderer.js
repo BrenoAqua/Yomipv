@@ -55,6 +55,7 @@ let currentAbortController = null;
 let currentPrioritizeKanjiMatch = false;
 let currentPrioritizeHiraganaMatch = false;
 let currentShowPitchAccents = true;
+let currentLookupRequestId = 0;
 
 const renderHeader = (term, reading, frequencies) => {
   const cleanTerm = (term || '').trim();
@@ -189,7 +190,7 @@ const buildFrequencies = (entries, targetExpression, targetReading, showFrequenc
   return Array.from(allFrequenciesMap.values());
 };
 
-const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents) => {
+const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents, lookupRequestId = currentLookupRequestId) => {
   const entry = rawEntries[index];
   if (!entry) return;
 
@@ -303,8 +304,13 @@ const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents) => {
   entryNext.style.display = showNav ? 'flex' : 'none';
   entryCounter.style.display = showNav ? '' : 'none';
   
-  // Sync active entry for Anki export matching
-  ipcRenderer.send('active-entry', { expression: fields.expression, reading: fields.reading });
+  // Sync active entry for Anki export matching and selector expansion.
+  ipcRenderer.send('active-entry', {
+    expression: fields.expression,
+    reading: fields.reading,
+    originalLength: fields._matchedOriginalLength || 0,
+    lookupRequestId
+  });
 };
 
 const sendSelectedDict = (el) => {
@@ -358,8 +364,9 @@ const sendSelectedDict = (el) => {
   ipcRenderer.send('dictionary-selected', dictContent);
 };
 
-const performLookup = async (term, showFrequencies, showPitchAccents, isBack = false, prioritizeKanjiMatch, prioritizeHiraganaMatch) => {
+const performLookup = async (term, showFrequencies, showPitchAccents, isBack = false, prioritizeKanjiMatch, prioritizeHiraganaMatch, lookupRequestId = currentLookupRequestId) => {
   console.log('[UI] Performing lookup for:', term);
+  lookupRequestId = Number(lookupRequestId || 0);
   
   clearSelection();
 
@@ -470,6 +477,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
     }
 
     if (!result) throw new Error('All Yomitan endpoints failed');
+    if (lookupRequestId !== currentLookupRequestId) return;
 
     currentDictionaryMedia = result.dictionaryMedia || (result[0] && result[0].dictionaryMedia) || [];
     const entries = (result && result.fields) || (result && result[0] && result[0].fields) || [];
@@ -531,6 +539,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
         }
       }
     } catch (_) { /* Fall back to prefix-match sort */ }
+    if (lookupRequestId !== currentLookupRequestId) return;
 
     const isHiraganaOnly = /^[\u3041-\u309F]+$/.test(term);
     const termChars = toNormalizedChars(term);
@@ -602,9 +611,19 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       }
     });
 
+    for (const entry of sorted) {
+      const fields = entry.fields || entry;
+      const origLen = getOrigLen(fields);
+      if (origLen > 0) {
+        fields._matchedOriginalLength = origLen;
+      } else {
+        delete fields._matchedOriginalLength;
+      }
+    }
+
     allEntries = sorted;
     currentEntryIndex = 0;
-    renderEntry(currentEntryIndex, allEntries, currentShowFrequencies, currentShowPitchAccents);
+    renderEntry(currentEntryIndex, allEntries, currentShowFrequencies, currentShowPitchAccents, lookupRequestId);
 
     if (signal.aborted) return;
 
@@ -661,6 +680,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
 ipcRenderer.on('lookup-term', async (event, data) => {
   console.log('[IPC] Received lookup data:', JSON.stringify(data));
+  currentLookupRequestId = Number(data.lookupRequestId || 0);
   
   if (data.theme === 'light') {
     document.body.classList.add('light-theme');
@@ -689,7 +709,15 @@ ipcRenderer.on('lookup-term', async (event, data) => {
   }
 
   lookupHistory = [];
-  performLookup(data.term, data.showFrequencies, data.showPitchAccents, false, data.prioritizeKanjiMatch, data.prioritizeHiraganaMatch);
+  performLookup(
+    data.term,
+    data.showFrequencies,
+    data.showPitchAccents,
+    false,
+    data.prioritizeKanjiMatch,
+    data.prioritizeHiraganaMatch,
+    currentLookupRequestId
+  );
 });
 
 const handleCopy = () => {

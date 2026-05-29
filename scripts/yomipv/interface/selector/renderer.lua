@@ -275,6 +275,7 @@ function Renderer.render(selector)
 								y = y_line + u_offset,
 								w = match_w,
 								color = seg.color,
+								term = seg.term,
 								is_colorizer = true,
 							})
 						end
@@ -302,6 +303,7 @@ function Renderer.render(selector)
 						y = y_line + u_offset,
 						w = underline_w,
 						color = color,
+						term = term,
 						is_colorizer = true,
 					})
 				end
@@ -425,20 +427,33 @@ function Renderer.render(selector)
 		end
 	end
 
-	-- Merge adjacent colorizer underlines sharing the same Y and color into one rect
+	-- Merge adjacent pieces of the same colorized term, but keep different
+	-- adjacent words visually separated even when they share the same color.
 	local merged = {}
 	for _, u in ipairs(underlines) do
 		if u.is_colorizer then
 			local found = false
 			for _, m in ipairs(merged) do
-				if m.is_colorizer and m.color == u.color and m.y == u.y and math.abs((m.x + m.w) - u.x) <= 1 then
+				if m.is_colorizer
+					and m.term ~= nil
+					and m.term == u.term
+					and m.color == u.color
+					and m.y == u.y
+					and math.abs((m.x + m.w) - u.x) <= 1 then
 					m.w = m.w + u.w
 					found = true
 					break
 				end
 			end
 			if not found then
-				table.insert(merged, { x = u.x, y = u.y, w = u.w, color = u.color, is_colorizer = true })
+				table.insert(merged, {
+					x = u.x,
+					y = u.y,
+					w = u.w,
+					color = u.color,
+					term = u.term,
+					is_colorizer = true,
+				})
 			end
 		else
 			table.insert(merged, u)
