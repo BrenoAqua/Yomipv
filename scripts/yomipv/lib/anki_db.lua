@@ -212,7 +212,10 @@ end
 
 local should_reject_single_yoon_reading
 
-local function find_clean_term(db, term)
+local function find_clean_term(db, term, opts)
+	opts = opts or {}
+	local allow_reading_match = opts.allow_reading_match ~= false
+
 	if type(term) ~= "string" or term == "" then return nil, nil, 0, nil end
 	local entry = db[term]
 	if entry then return entry, term, 0, "exact" end
@@ -232,7 +235,7 @@ local function find_clean_term(db, term)
 				return entry_for_base, base, base_stripped_bytes, kind
 			end
 
-			if _reading_index and is_kana_only(base) and utf8_char_count(base) >= 3 then
+			if allow_reading_match and _reading_index and is_kana_only(base) and utf8_char_count(base) >= 3 then
 				local reading_term = _reading_index[normalize_kana(base)]
 				if reading_term and reading_term ~= base then
 					local reading_entry = db[reading_term]
@@ -252,7 +255,8 @@ local function find_clean_term(db, term)
 		return stripped_entry, stripped, stripped_bytes, match_kind
 	end
 
-	if _reading_index
+	if allow_reading_match
+		and _reading_index
 		and is_kana_only(term)
 		and is_single_kana_script(term)
 		and utf8_char_count(term) >= 2 then
@@ -265,7 +269,7 @@ local function find_clean_term(db, term)
 		end
 	end
 
-	if _reading_index then
+	if allow_reading_match and _reading_index then
 		local reading_entry, reading_term, reading_stripped_bytes, reading_match_kind =
 			Conjugations.each_kana_adj_reading_term(term, { is_kana_only = is_kana_only }, function(
 				base,
@@ -289,12 +293,12 @@ local function find_clean_term(db, term)
 	return nil, nil, 0, nil
 end
 
-local function has_database_match(db, term)
+local function has_database_match(db, term, opts)
 	if type(term) ~= "string" or term == "" then
 		return false
 	end
 
-	local entry = find_clean_term(db, term)
+	local entry = find_clean_term(db, term, opts)
 	return entry ~= nil
 end
 
@@ -1038,7 +1042,9 @@ function AnkiDB.get_tokens_colors(tokens)
 
 				if not has_boundary and has_selectable and combined ~= "" then
 					local skip = options.colorizer_ignore_kana_only and not contains_kanji(combined)
-					if skip and has_database_match(db, combined) then skip = false end
+					if skip and has_database_match(db, combined, { allow_reading_match = false }) then
+						skip = false
+					end
 
 					if not skip then
 						local entry, matched, stripped, match_kind = find_clean_term(db, combined)
@@ -1063,7 +1069,7 @@ function AnkiDB.get_tokens_colors(tokens)
 				local token = tokens[t_idx]
 				local text_is_single_kana = is_single_kana_string(token.text or "")
 				local skip_kana = options.colorizer_ignore_kana_only and not contains_kanji(token.text or "")
-				if skip_kana and has_database_match(db, token.text) then
+				if skip_kana and has_database_match(db, token.text, { allow_reading_match = false }) then
 					skip_kana = false
 				end
 
@@ -1164,7 +1170,8 @@ function AnkiDB.get_tokens_colors(tokens)
 						match_kind = "compound_stem"
 					end
 					if entry then
-						if not (sub_is_kana_only and not has_database_match(db, sub)) then
+						local has_surface_match = has_database_match(db, sub, { allow_reading_match = false })
+						if not (sub_is_kana_only and not has_surface_match) then
 							local color = word_color(entry)
 							if color and not should_split_kana_particle(
 								get_surface_match_text(sub, stripped_bytes, match_kind),
