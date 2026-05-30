@@ -192,6 +192,10 @@ function Conjugations.is_valid_verb_match(term, ending, rep)
 		return true
 	end
 
+	if rep == "くる" and #term == #ending and (ending == "きそう" or ending == "こよう") then
+		return true
+	end
+
 	return rep == "する" and #term == #ending and #ending >= #"した"
 end
 
@@ -992,7 +996,19 @@ local verb_endings = {
 	{ ending = "せば", rep = "す" },
 	{ ending = "せよ", rep = "する" },
 	{ ending = "せる", rep = "す" },
+	{ ending = "いそう", rep = "う" },
+	{ ending = "きそう", rep = "く" },
+	{ ending = "きそう", rep = "くる" },
+	{ ending = "ぎそう", rep = "ぐ" },
+	{ ending = "しそう", rep = "す" },
+	{ ending = "しそう", rep = "する" },
 	{ ending = "そう", rep = "す" },
+	{ ending = "そう", rep = "る" },
+	{ ending = "ちそう", rep = "つ" },
+	{ ending = "にそう", rep = "ぬ" },
+	{ ending = "びそう", rep = "ぶ" },
+	{ ending = "みそう", rep = "む" },
+	{ ending = "りそう", rep = "る" },
 	{ ending = "たい", rep = "る" },
 	{ ending = "たず", rep = "つ" },
 	{ ending = "た", rep = "る" },
@@ -1034,6 +1050,8 @@ local verb_endings = {
 	{ ending = "めば", rep = "む" },
 	{ ending = "める", rep = "む" },
 	{ ending = "もう", rep = "む" },
+	{ ending = "ようか", rep = "る" },
+	{ ending = "よっか", rep = "る" },
 	{ ending = "よう", rep = "る" },
 	{ ending = "らず", rep = "る" },
 	{ ending = "るな", rep = "る" },
