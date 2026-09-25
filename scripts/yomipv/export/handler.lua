@@ -298,8 +298,18 @@ function Handler:start_selector_flow(context, was_paused)
 		msg.info("Tokenize callback received")
 		if tokenization_error then
 			msg.error("Tokenization error: " .. tokenization_error)
+			self.is_exporting = false
 			self.expand_to_subtitle = nil
-			return Player.notify("Yomitan tokenization failed: " .. tokenization_error, "error", 2)
+
+			if not was_paused then
+				mp.set_property_native("pause", false)
+			end
+
+			return Player.notify(
+				"Yomitan tokenization failed: " .. tokenization_error,
+				"error",
+				2
+			)
 		end
 
 		context.raw_content = raw_content_result
