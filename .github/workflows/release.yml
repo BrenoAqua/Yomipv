@@ -118,7 +118,7 @@ jobs:
         working-directory: scripts/yomipv/lookup-app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --mac dir --x64 --publish never
+        run: npx electron-builder --mac dir --universal --publish never
         
       - name: Upload macOS Asset
         uses: actions/upload-artifact@v4

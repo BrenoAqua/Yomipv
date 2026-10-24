@@ -10,7 +10,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder -mwl --x64"
+    "build": "electron-builder -mwl --universal"
   },
   "devDependencies": {
     "electron": "^40.4.1",
